@@ -1,0 +1,40 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ===== 가상환경 =====
+.venv/
+venv/
+env/
+ENV/
+
+# ===== Jupyter =====
+.ipynb_checkpoints/
+
+# ===== IDE / OS =====
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ===== 데이터 (원본/가공/DB는 추적하지 않음) =====
+data/raw/*
+data/processed/*
+data/db/*
+
+# 폴더 구조는 유지하기 위해 .gitkeep 은 추적
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/db/.gitkeep
+
+# ===== 환경변수 / 비밀정보 =====
+.env
+*.key
+secrets.*
