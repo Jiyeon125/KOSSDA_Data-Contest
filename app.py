@@ -20,7 +20,7 @@ import pandas as pd
 import streamlit as st
 
 from src import queries
-from src.charts import bar_chart
+from src.charts import bar_chart, histogram
 
 # ----------------------------------------------------------------------
 # 페이지 기본 설정
@@ -66,6 +66,18 @@ def get_value_counts(table_name: str, column: str, top_n: int = 20) -> pd.DataFr
         f'LIMIT ?;'
     )
     return queries.run_query(sql, params=(top_n,))
+
+
+@st.cache_data(show_spinner=False)
+def get_column_series(table_name: str, column: str, max_rows: int = 50000) -> pd.DataFrame:
+    """선택한 컬럼 값을 (최대 max_rows 까지) 조회한다.
+
+    데이터가 커질 수 있으므로 LIMIT 으로 상한을 둔다.
+    """
+    safe_table = str(table_name).replace('"', '""')
+    safe_col = str(column).replace('"', '""')
+    sql = f'SELECT "{safe_col}" AS 값 FROM "{safe_table}" LIMIT ?;'
+    return queries.run_query(sql, params=(max_rows,))
 
 
 # ----------------------------------------------------------------------
@@ -193,9 +205,9 @@ else:
 st.divider()
 
 # ----------------------------------------------------------------------
-# 6. 샘플 시각화 영역 (value_counts 막대그래프)
+# 6. 탐색 시각화 (1) - 값 빈도 막대그래프
 # ----------------------------------------------------------------------
-st.header("6. 샘플 시각화 영역")
+st.header("6. 탐색 시각화 (1) · 값 빈도")
 st.markdown(
     "분석용 컬럼이 아직 확정되지 않았으므로, 선택한 컬럼의 "
     "**값 빈도(value_counts)** 를 막대그래프로 보여줍니다. "
@@ -229,6 +241,53 @@ else:
                 st.dataframe(counts_df, use_container_width=True, hide_index=True)
     except Exception as exc:  # noqa: BLE001
         st.error(f"빈도 계산 실패: {exc}")
+
+st.divider()
+
+# ----------------------------------------------------------------------
+# 7. 탐색 시각화 (2) - 수치형 컬럼 히스토그램
+# ----------------------------------------------------------------------
+st.header("7. 탐색 시각화 (2) · 수치형 분포")
+st.markdown(
+    "선택한 컬럼이 **수치형**일 경우 히스토그램으로 분포를 확인합니다. "
+    "*(코드값일 수 있으므로 분포 해석은 코드북 확인 후 진행하세요.)*"
+)
+
+if not selected_table or not columns:
+    st.caption("테이블과 컬럼이 준비되면 히스토그램을 그릴 수 있습니다.")
+else:
+    hist_column = st.selectbox(
+        "히스토그램을 볼 컬럼 선택", options=columns, key="hist_col"
+    )
+    nbins = st.slider("구간(bin) 개수", min_value=5, max_value=60, value=30, step=1)
+
+    try:
+        series_df = get_column_series(selected_table, hist_column)
+        # 문자열 등으로 저장된 값을 수치로 변환 시도 (변환 불가 값은 결측 처리)
+        numeric_values = pd.to_numeric(series_df["값"], errors="coerce").dropna()
+
+        if numeric_values.empty:
+            st.info(
+                "이 컬럼은 수치형으로 해석할 수 없어 히스토그램을 그릴 수 없습니다. "
+                "(범주형 컬럼은 위의 '값 빈도' 섹션을 사용하세요.)"
+            )
+        else:
+            plot_df = pd.DataFrame({hist_column: numeric_values.values})
+            fig_hist = histogram(
+                plot_df,
+                x=hist_column,
+                title=f"'{hist_column}' 분포 (수치형, n={len(numeric_values):,})",
+                nbins=nbins,
+            )
+            st.plotly_chart(fig_hist, use_container_width=True)
+
+            with st.expander("기초 통계 보기"):
+                st.dataframe(
+                    numeric_values.describe().to_frame(name=hist_column),
+                    use_container_width=True,
+                )
+    except Exception as exc:  # noqa: BLE001
+        st.error(f"히스토그램 생성 실패: {exc}")
 
 st.divider()
 st.caption(

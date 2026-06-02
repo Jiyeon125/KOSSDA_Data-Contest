@@ -24,10 +24,11 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# ===== 데이터 폴더 (원본/가공/DB는 추적하지 않음) =====
+# ===== 데이터 폴더 (원본/가공/DB/코드북은 추적하지 않음) =====
 data/raw/
 data/processed/
 data/db/
+data/codebook/
 
 # ===== 데이터 파일 확장자 (어디에 있든 추적하지 않음) =====
 *.csv
@@ -45,5 +46,9 @@ secrets.*
 
 # 폴더 구조는 유지하기 위해 .gitkeep 은 추적
 !data/raw/.gitkeep
+!data/raw/youth_life/.gitkeep
+!data/raw/klips/.gitkeep
+!data/raw/eaps/.gitkeep
 !data/processed/.gitkeep
 !data/db/.gitkeep
+!data/codebook/.gitkeep

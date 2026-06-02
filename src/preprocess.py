@@ -21,6 +21,20 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 RAW_DIR = PROJECT_ROOT / "data" / "raw"
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
 
+# 파일명에 포함되면 '코드북(변수 해석용 참고자료)'으로 간주할 키워드.
+# 코드북은 분석 데이터가 아니므로 DB 적재 대상에서 제외한다.
+CODEBOOK_KEYWORDS = ("codebook", "code_book", "코드북", "변수설명", "변수정의", "layout")
+
+
+def looks_like_codebook(name: str) -> bool:
+    """파일명이 코드북으로 보이는지 판단한다.
+
+    코드북 파일과 실제 분석 데이터 파일을 구분하기 위한 휴리스틱이다.
+    (예: "klips_codebook.xlsx", "청년삶_코드북.csv" -> True)
+    """
+    lowered = str(name).lower()
+    return any(keyword in lowered for keyword in CODEBOOK_KEYWORDS)
+
 
 def normalize_column_names(df: pd.DataFrame) -> pd.DataFrame:
     """컬럼명을 정규화한다.
@@ -96,15 +110,17 @@ def save_processed_csv(df: pd.DataFrame, file_name: str) -> Path:
 
     Args:
         df: 저장할 DataFrame.
-        file_name: 저장할 파일명 (예: "youth_clean.csv"). 확장자가 없으면 .csv 추가.
+        file_name: 저장할 파일명 또는 상대경로
+            (예: "youth_clean.csv" 또는 "youth_life/youth_2024_clean.csv").
+            확장자가 없으면 .csv 를 붙인다.
 
     Returns:
         저장된 파일 경로.
     """
-    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
-
     name = file_name if file_name.lower().endswith(".csv") else f"{file_name}.csv"
     out_path = PROCESSED_DIR / name
+    # 하위 폴더 경로가 포함될 수 있으므로 부모 디렉터리까지 생성
+    out_path.parent.mkdir(parents=True, exist_ok=True)
 
     # 한글 깨짐 방지를 위해 utf-8-sig 사용
     df.to_csv(out_path, index=False, encoding="utf-8-sig")

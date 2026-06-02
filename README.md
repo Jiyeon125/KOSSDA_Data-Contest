@@ -39,21 +39,26 @@ KOSSDA_Data-Contest/
 ├─ .gitignore
 │
 ├─ data/                  # (git 추적 제외)
-│  ├─ raw/                # 원본 데이터
+│  ├─ raw/                # 원본 데이터 (출처별 하위 폴더로 정리)
+│  │  ├─ youth_life/      # 청년삶실태조사 2022, 2024 (메인)
+│  │  ├─ klips/           # KLIPS p/h 파일 (KOSSDA 보조)
+│  │  └─ eaps/            # 경제활동인구조사/청년부가조사 (배경)
 │  ├─ processed/          # 전처리 데이터
-│  └─ db/                 # SQLite DB (youth_analysis.sqlite3)
+│  ├─ db/                 # SQLite DB (youth_analysis.sqlite3)
+│  └─ codebook/           # 코드북 (변수 해석용 참고자료, DB 적재 X)
 │
 ├─ src/
-│  ├─ inspect_data.py     # 원본 데이터 구조 점검
+│  ├─ inspect_data.py     # 원본 데이터 구조 점검 (하위 폴더 재귀 탐색)
 │  ├─ preprocess.py       # 원본 → 전처리 (범용 함수)
-│  ├─ build_db.py         # processed CSV → SQLite 적재
+│  ├─ build_db.py         # processed CSV → SQLite 적재 (코드북 제외)
 │  ├─ queries.py          # SQL 조회 → DataFrame
-│  └─ charts.py           # Plotly 차트 함수
+│  └─ charts.py           # Plotly 차트 함수 (막대/히스토그램)
 │
 ├─ notebooks/
 │  └─ 01_data_check.ipynb # 데이터 점검용 노트북
 │
 ├─ docs/
+│  ├─ project_context.md  # 프로젝트 배경지식 (작업 전 필독)
 │  ├─ proposal.md         # 기획서
 │  ├─ analysis_plan.md    # 분석 계획
 │  └─ prompt_log.md       # 프롬프트/작업 로그
@@ -61,6 +66,10 @@ KOSSDA_Data-Contest/
 └─ assets/
    └─ images/             # 이미지 자료
 ```
+
+> 원본 데이터는 출처별 하위 폴더(`youth_life/`, `klips/`, `eaps/`)로 정리한다.
+> 코드북 파일은 `data/codebook/` 에 따로 두며, DB 에는 적재하지 않는다.
+> 데이터 파일(`*.csv`, `*.xlsx`, `*.sav`, `*.dta`, `*.sqlite3`, `*.db`)은 GitHub 에 올리지 않는다.
 
 ## 실행 방법
 
@@ -85,17 +94,20 @@ pip install -r requirements.txt
 원본 데이터는 GitHub에 올리지 않습니다. (`data/raw`, `data/processed`, `data/db` 및 `*.csv/*.xlsx/*.sav/*.dta/*.sqlite3/*.db` 는 `.gitignore` 처리됨)
 
 ```bash
-# 1) 원본 데이터를 data/raw/ 에 넣기 (csv 또는 xlsx)
+# 1) 원본 데이터를 data/raw/<출처>/ 에 넣기 (csv 또는 xlsx)
+#    예) data/raw/youth_life/, data/raw/klips/, data/raw/eaps/
+#    코드북은 data/codebook/ 에 따로 둔다.
 
-# 2) 데이터 구조 확인 (행/열 수, 컬럼명, 결측치, dtype 등)
+# 2) 데이터 구조 확인 (행/열 수, 컬럼명, 결측치, dtype 등) — 하위 폴더까지 재귀 탐색
 python src/inspect_data.py
-#   → 특정 파일만 보려면: python src/inspect_data.py 파일명.csv
+#   → 특정 파일만: python src/inspect_data.py youth_life/youth_2024.csv
 
 # 3) 전처리 수행 (data/processed 에 정제 CSV 저장)
 python src/preprocess.py
 
-# 4) SQLite DB 생성 (data/db/youth_analysis.sqlite3)
+# 4) SQLite DB 생성 (data/db/youth_analysis.sqlite3) — 코드북 자동 제외
 python src/build_db.py
+#   → 특정 파일만: python src/build_db.py youth_life/youth_2024_clean.csv
 
 # 5) Streamlit 실행
 streamlit run app.py

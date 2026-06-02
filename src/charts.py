@@ -40,6 +40,34 @@ def bar_chart(
     return fig
 
 
+def histogram(
+    df: pd.DataFrame,
+    x: str,
+    title: str = "히스토그램",
+    nbins: int = 30,
+) -> go.Figure:
+    """수치형 컬럼의 분포를 보는 히스토그램을 생성한다.
+
+    Args:
+        df: 시각화할 DataFrame.
+        x: 분포를 볼 (수치형) 컬럼명.
+        title: 차트 제목.
+        nbins: 구간(bin) 개수.
+
+    Returns:
+        plotly Figure 객체.
+    """
+    fig = px.histogram(df, x=x, nbins=nbins, title=title)
+    fig.update_layout(
+        xaxis_title=x,
+        yaxis_title="빈도",
+        title_x=0.0,
+        bargap=0.05,
+        margin=dict(l=20, r=20, t=60, b=20),
+    )
+    return fig
+
+
 if __name__ == "__main__":
     # 샘플 데이터로 동작 확인용 (실제 분석 결과 아님)
     sample = pd.DataFrame(
@@ -47,3 +75,5 @@ if __name__ == "__main__":
     )
     fig = bar_chart(sample, x="category", y="value", title="샘플 막대그래프")
     print("charts.bar_chart 생성 완료:", type(fig))
+    fig2 = histogram(sample, x="value", title="샘플 히스토그램")
+    print("charts.histogram 생성 완료:", type(fig2))
