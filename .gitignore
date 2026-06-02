@@ -24,17 +24,26 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# ===== 데이터 (원본/가공/DB는 추적하지 않음) =====
-data/raw/*
-data/processed/*
-data/db/*
+# ===== 데이터 폴더 (원본/가공/DB는 추적하지 않음) =====
+data/raw/
+data/processed/
+data/db/
+
+# ===== 데이터 파일 확장자 (어디에 있든 추적하지 않음) =====
+*.csv
+*.xlsx
+*.sav
+*.dta
+*.sqlite3
+*.db
+
+# ===== 환경변수 / 비밀정보 =====
+.env
+.streamlit/secrets.toml
+*.key
+secrets.*
 
 # 폴더 구조는 유지하기 위해 .gitkeep 은 추적
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 !data/db/.gitkeep
-
-# ===== 환경변수 / 비밀정보 =====
-.env
-*.key
-secrets.*

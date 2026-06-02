@@ -1,73 +1,133 @@
-"""원본 데이터 전처리 모듈.
+"""원본 데이터 전처리 모듈 (범용 함수 모음).
 
-data/raw 의 원본 파일을 읽어 분석에 사용할 형태로 가공한 뒤
-data/processed 에 저장하는 함수들을 모아둔다.
+아직 실제 데이터의 구체적인 컬럼명이 확정되지 않았으므로,
+특정 데이터에 종속되지 않는 범용 전처리 함수들을 제공한다.
+실제 컬럼이 확정되면 main() 안에서 이 함수들을 조합해 사용한다.
 
-주의:
-    아직 실제 데이터가 없으므로 아래 함수는 최소한의 골격만 제공한다.
-    실제 데이터가 들어오면 컬럼명/결측 처리/타입 변환 로직을 채워 넣으면 된다.
+실행 방법:
+    python src/preprocess.py
 """
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
+from typing import Iterable, Sequence
 
 import pandas as pd
 
-# 프로젝트 루트 기준 경로 (src/ 의 부모 디렉터리)
+# 프로젝트 루트 기준 경로 (Windows 호환을 위해 pathlib 사용)
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 RAW_DIR = PROJECT_ROOT / "data" / "raw"
 PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
 
 
-def load_raw_csv(filename: str, **read_csv_kwargs) -> pd.DataFrame:
-    """data/raw 폴더에서 CSV 파일 하나를 읽어 DataFrame 으로 반환한다.
+def normalize_column_names(df: pd.DataFrame) -> pd.DataFrame:
+    """컬럼명을 정규화한다.
 
-    Args:
-        filename: data/raw 안의 파일명 (예: "youth.csv").
-        **read_csv_kwargs: pandas.read_csv 에 그대로 전달할 옵션.
+    - 앞뒤 공백 제거
+    - 영문 소문자화
+    - 공백/연속 공백을 단일 언더스코어(_)로 치환
+    - 영문/숫자/언더스코어/한글 외 특수문자 제거
 
-    Returns:
-        읽어들인 DataFrame.
-
-    Raises:
-        FileNotFoundError: 해당 파일이 없을 때.
-    """
-    path = RAW_DIR / filename
-    if not path.exists():
-        raise FileNotFoundError(f"[preprocess] 원본 파일을 찾을 수 없습니다: {path}")
-    return pd.read_csv(path, **read_csv_kwargs)
-
-
-def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """기본 정제 로직 골격.
-
-    실제 데이터가 확정되면 이 함수 안에서 결측치 처리, 컬럼명 정리,
-    타입 변환 등을 수행한다. 현재는 입력을 그대로 복사해 반환한다.
+    원본 DataFrame 은 변경하지 않고 복사본을 반환한다.
     """
     cleaned = df.copy()
-    # TODO: 실제 데이터 스키마에 맞춰 전처리 로직 추가
-    # 예) cleaned = cleaned.dropna(subset=["age"])
-    # 예) cleaned.columns = [c.strip().lower() for c in cleaned.columns]
+
+    def _clean(name: object) -> str:
+        text = str(name).strip().lower()
+        # 공백류를 언더스코어로
+        text = re.sub(r"\s+", "_", text)
+        # 한글, 영문, 숫자, 언더스코어만 남기고 제거
+        text = re.sub(r"[^0-9a-z_가-힣]", "", text)
+        # 연속 언더스코어 정리 및 양 끝 언더스코어 제거
+        text = re.sub(r"_+", "_", text).strip("_")
+        return text or "col"
+
+    cleaned.columns = [_clean(c) for c in cleaned.columns]
     return cleaned
 
 
-def save_processed(df: pd.DataFrame, filename: str) -> Path:
-    """가공된 DataFrame 을 data/processed 폴더에 CSV 로 저장한다.
+def select_columns(df: pd.DataFrame, columns: Sequence[str]) -> pd.DataFrame:
+    """필요한 컬럼만 선택해 반환한다.
+
+    Args:
+        df: 입력 DataFrame.
+        columns: 선택할 컬럼명 목록.
+
+    Raises:
+        KeyError: 존재하지 않는 컬럼을 요청했을 때.
+    """
+    missing = [c for c in columns if c not in df.columns]
+    if missing:
+        raise KeyError(
+            f"[preprocess] 존재하지 않는 컬럼: {missing}\n"
+            f"             사용 가능한 컬럼: {list(df.columns)}"
+        )
+    return df.loc[:, list(columns)].copy()
+
+
+def replace_missing_codes(
+    df: pd.DataFrame,
+    missing_codes: Iterable,
+    columns: Sequence[str] | None = None,
+) -> pd.DataFrame:
+    """특정 코드값(예: -9, 99, "모름")을 결측치(NaN)로 변환한다.
+
+    설문 데이터는 무응답/모름 등을 특수 코드로 표기하는 경우가 많다.
+
+    Args:
+        df: 입력 DataFrame.
+        missing_codes: 결측으로 처리할 값들의 목록.
+        columns: 적용할 컬럼 목록. None 이면 전체 컬럼에 적용.
+
+    Returns:
+        결측 코드가 NaN 으로 치환된 복사본.
+    """
+    cleaned = df.copy()
+    target_cols = list(columns) if columns is not None else list(cleaned.columns)
+    codes = list(missing_codes)
+    cleaned[target_cols] = cleaned[target_cols].replace(codes, pd.NA)
+    return cleaned
+
+
+def save_processed_csv(df: pd.DataFrame, file_name: str) -> Path:
+    """전처리된 DataFrame 을 data/processed 폴더에 CSV 로 저장한다.
 
     Args:
         df: 저장할 DataFrame.
-        filename: 저장할 파일명 (예: "youth_clean.csv").
+        file_name: 저장할 파일명 (예: "youth_clean.csv"). 확장자가 없으면 .csv 추가.
 
     Returns:
-        저장된 파일의 경로.
+        저장된 파일 경로.
     """
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = PROCESSED_DIR / filename
+
+    name = file_name if file_name.lower().endswith(".csv") else f"{file_name}.csv"
+    out_path = PROCESSED_DIR / name
+
+    # 한글 깨짐 방지를 위해 utf-8-sig 사용
     df.to_csv(out_path, index=False, encoding="utf-8-sig")
-    print(f"[preprocess] 저장 완료: {out_path}")
+    print(f"[preprocess] 저장 완료: {out_path} ({len(df):,} 행)")
     return out_path
 
 
+def main() -> int:
+    """전처리 파이프라인 진입점 (골격).
+
+    실제 컬럼이 확정되면 아래 흐름을 채워 넣는다:
+        1) data/raw 에서 원본 읽기 (inspect_data.read_data_file 활용 가능)
+        2) normalize_column_names
+        3) replace_missing_codes
+        4) select_columns
+        5) save_processed_csv
+    """
+    print("[preprocess] 범용 전처리 함수 모듈입니다.")
+    print("            실제 컬럼이 확정되면 main() 안에서 함수를 조합해 사용하세요.")
+    print(f"            원본 폴더:   {RAW_DIR}")
+    print(f"            저장 폴더:   {PROCESSED_DIR}")
+    return 0
+
+
 if __name__ == "__main__":
-    print("preprocess 모듈 골격입니다. 실제 데이터가 준비되면 함수를 호출하세요.")
+    raise SystemExit(main())

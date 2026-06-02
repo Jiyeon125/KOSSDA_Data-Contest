@@ -44,8 +44,9 @@ KOSSDA_Data-Contest/
 │  └─ db/                 # SQLite DB (youth_analysis.sqlite3)
 │
 ├─ src/
-│  ├─ preprocess.py       # 원본 → 전처리
-│  ├─ build_db.py         # CSV → SQLite 적재
+│  ├─ inspect_data.py     # 원본 데이터 구조 점검
+│  ├─ preprocess.py       # 원본 → 전처리 (범용 함수)
+│  ├─ build_db.py         # processed CSV → SQLite 적재
 │  ├─ queries.py          # SQL 조회 → DataFrame
 │  └─ charts.py           # Plotly 차트 함수
 │
@@ -79,19 +80,28 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3) (실제 데이터가 있을 때) DB 생성
+### 3) 실데이터 파이프라인 실행 순서
 
-`data/raw/` 에 CSV 파일을 넣은 뒤:
-
-```bash
-python -m src.build_db
-```
-
-### 4) Streamlit 앱 실행
+원본 데이터는 GitHub에 올리지 않습니다. (`data/raw`, `data/processed`, `data/db` 및 `*.csv/*.xlsx/*.sav/*.dta/*.sqlite3/*.db` 는 `.gitignore` 처리됨)
 
 ```bash
+# 1) 원본 데이터를 data/raw/ 에 넣기 (csv 또는 xlsx)
+
+# 2) 데이터 구조 확인 (행/열 수, 컬럼명, 결측치, dtype 등)
+python src/inspect_data.py
+#   → 특정 파일만 보려면: python src/inspect_data.py 파일명.csv
+
+# 3) 전처리 수행 (data/processed 에 정제 CSV 저장)
+python src/preprocess.py
+
+# 4) SQLite DB 생성 (data/db/youth_analysis.sqlite3)
+python src/build_db.py
+
+# 5) Streamlit 실행
 streamlit run app.py
 ```
+
+> 참고: DB 파일이 아직 없어도 Streamlit 앱은 정상 실행되며, 화면에서 다음 단계 안내를 보여줍니다.
 
 ## 데이터 출처
 
