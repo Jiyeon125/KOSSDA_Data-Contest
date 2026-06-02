@@ -6,7 +6,7 @@ alwaysApply: true
 # 프로젝트 작업 규칙
 
 이 프로젝트는 **청년 '쉬었음' 집단의 내부 취약성**을 분석하는 KOSSDA 공모전 + 경영정보처리론 과제 프로젝트다.
-작업 전 반드시 [`docs/project_context.md`](mdc:docs/project_context.md)를 참조한다. 아래는 핵심 요약이다.
+작업 전 반드시 [`docs/project_context.md`](mdc:docs/project_context.md)와 [`docs/research_design.md`](mdc:docs/research_design.md)를 참조한다. 아래는 핵심 요약이다.
 
 ## 데이터 역할 (혼동 금지)
 - **경제활동인구조사**: 배경/문제 제기 (쉬었음 규모, 실업과의 차이)
@@ -24,6 +24,12 @@ alwaysApply: true
 
 ## 코드북 우선 원칙
 - 1, 2, 9, 99, 999 등 코드값을 **코드북 확인 전에 결측/응답값으로 임의 판단하지 않는다.**
+
+## 통계적 검증 원칙 (공모전 핵심)
+- 집단 비교는 **평균/막대만** 제시하지 말고 **검정(p값) + 효과크기 + 표본수**를 함께 보고한다.
+- 금액 변수는 치우침이 크므로 **비모수(Mann-Whitney U) + 중앙값** 우선, 범주형(보유율 등)은 **카이제곱/Fisher**.
+- 표본이 크면 작은 차이도 유의 → 효과크기 동반. '도움 없음'(~89명)처럼 **소표본은 검정력 한계 명시.**
+- 다중비교 위양성 주의. **유의하지 않은 결과도 그대로 해석**하고 결과를 억지로 유의하게 만들지 않는다.
 
 ## 파이프라인 / 모듈 역할
 `data/raw` → `inspect_data.py`(구조 확인) → `preprocess.py`(전처리) → `build_db.py`(SQLite 적재) → `queries.py`(SQL) → `charts.py`(시각화) → `app.py`(Streamlit)

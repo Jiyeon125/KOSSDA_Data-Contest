@@ -68,6 +68,55 @@ def histogram(
     return fig
 
 
+def grouped_bar(
+    df: pd.DataFrame,
+    x: str,
+    y: str,
+    color: str,
+    title: str = "그룹 막대그래프",
+    barmode: str = "group",
+) -> go.Figure:
+    """그룹(색상)별 막대그래프를 생성한다 (집단 비교용).
+
+    Args:
+        df: long 형태의 DataFrame.
+        x: x축 범주 컬럼.
+        y: y축 값 컬럼.
+        color: 그룹(색상) 구분 컬럼.
+        title: 차트 제목.
+        barmode: "group" | "stack".
+    """
+    fig = px.bar(df, x=x, y=y, color=color, barmode=barmode, title=title, text_auto=True)
+    fig.update_layout(
+        title_x=0.0,
+        margin=dict(l=20, r=20, t=60, b=20),
+        legend_title_text=color,
+    )
+    return fig
+
+
+def box_chart(
+    df: pd.DataFrame,
+    x: str,
+    y: str,
+    title: str = "박스플롯",
+) -> go.Figure:
+    """그룹(x)별 수치 분포 박스플롯을 생성한다.
+
+    Args:
+        df: 시각화할 DataFrame.
+        x: 그룹 컬럼.
+        y: 수치 컬럼.
+        title: 차트 제목.
+    """
+    fig = px.box(df, x=x, y=y, title=title, points="outliers")
+    fig.update_layout(
+        title_x=0.0,
+        margin=dict(l=20, r=20, t=60, b=20),
+    )
+    return fig
+
+
 if __name__ == "__main__":
     # 샘플 데이터로 동작 확인용 (실제 분석 결과 아님)
     sample = pd.DataFrame(

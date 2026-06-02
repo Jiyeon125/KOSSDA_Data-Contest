@@ -82,6 +82,89 @@ def preview_table(
     return run_query(sql, params=(limit,), db_path=db_path)
 
 
+# ----------------------------------------------------------------------
+# 청년삶 2024 분석용 테이블/헬퍼
+# ----------------------------------------------------------------------
+YOUTH_ALL_TABLE = "youth_life_youth_2024_all"
+YOUTH_RESTED_TABLE = "youth_life_youth_2024_rested"
+
+
+def _fetch_columns(table_name: str, columns: list[str], db_path: Path = DB_PATH) -> pd.DataFrame:
+    """테이블에서 지정한 컬럼만 조회한다."""
+    safe_table = str(table_name).replace('"', '""')
+    cols_sql = ", ".join(f'"{c}"' for c in columns)
+    return run_query(f'SELECT {cols_sql} FROM "{safe_table}";', db_path=db_path)
+
+
+def numeric_summary(
+    table_name: str,
+    columns: list[str],
+    db_path: Path = DB_PATH,
+) -> pd.DataFrame:
+    """수치형 컬럼들의 기술통계를 계산한다.
+
+    각 컬럼별로 평균/중앙값/Q1/Q3/0 비율/양수자 평균/표본수를 반환한다.
+    (분석 1: 쉬었음 청년 기술통계)
+    """
+    df = _fetch_columns(table_name, columns, db_path=db_path)
+    rows = []
+    for col in columns:
+        s = pd.to_numeric(df[col], errors="coerce").dropna()
+        if s.empty:
+            continue
+        positive = s[s > 0]
+        rows.append(
+            {
+                "변수": col,
+                "n": int(s.size),
+                "평균": round(float(s.mean()), 1),
+                "중앙값": round(float(s.median()), 1),
+                "Q1": round(float(s.quantile(0.25)), 1),
+                "Q3": round(float(s.quantile(0.75)), 1),
+                "0_비율(%)": round(float((s == 0).mean() * 100), 1),
+                "양수자_평균": round(float(positive.mean()), 1) if not positive.empty else 0.0,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def help_network_share(
+    table_name: str,
+    db_path: Path = DB_PATH,
+) -> pd.DataFrame:
+    """생활비 부족 시 도움 가능 집단의 응답 비율(%)을 계산한다.
+
+    (분석 2: 생활비 지원망)
+    """
+    help_cols = {
+        "help_family": "가족",
+        "help_acquaintance": "지인",
+        "help_public": "공공기관",
+        "help_private": "민간기관",
+        "help_none": "없음",
+    }
+    df = _fetch_columns(table_name, list(help_cols), db_path=db_path)
+    rows = []
+    for col, label in help_cols.items():
+        s = pd.to_numeric(df[col], errors="coerce")
+        rows.append({"집단": label, "비율(%)": round(float((s == 1).mean() * 100), 1)})
+    return pd.DataFrame(rows)
+
+
+def group_means(
+    table_name: str,
+    group_col: str,
+    value_cols: list[str],
+    db_path: Path = DB_PATH,
+) -> pd.DataFrame:
+    """그룹별 평균을 계산한다 (분석 3·4: 부모동거 / 도움유무 비교)."""
+    df = _fetch_columns(table_name, [group_col] + value_cols, db_path=db_path)
+    for c in value_cols:
+        df[c] = pd.to_numeric(df[c], errors="coerce")
+    agg = df.groupby(group_col)[value_cols].mean().round(1).reset_index()
+    return agg
+
+
 if __name__ == "__main__":
     try:
         tables = list_tables()
