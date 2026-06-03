@@ -455,6 +455,76 @@ def _print_validation(df: pd.DataFrame, total_raw: int) -> None:
     print("=" * 60 + "\n")
 
 
+def _derive_safety_and_vuln(work: pd.DataFrame) -> None:
+    """생활비 지원망·금융부담·고립·취약점수 파생 (in-place, 2022/2024 공통).
+
+    원본 컬럼명이 연도별로 달라도, 이 단계에서는 이미 분석용 영문명으로
+    통일된 상태이므로 두 연도에 동일하게 적용된다.
+    """
+    # 생활비 지원망 플래그 (복수응답 1=해당)
+    help_cols = [c for c in ["help_living_family", "help_living_acq",
+                             "help_living_public", "help_living_private"]
+                 if c in work.columns]
+    if help_cols:
+        work["has_help"] = work[help_cols].eq(1).any(axis=1).astype(int)
+    if "help_living_family" in work.columns:
+        work["family_help_flag"] = work["help_living_family"].eq(1).astype(int)
+    if "help_living_none" in work.columns:
+        work["no_help_flag"] = work["help_living_none"].eq(1).astype(int)
+    if "live_with_parents" in work.columns:
+        work["not_parent_cohabit"] = work["live_with_parents"].eq(2).astype(int)
+
+    # 생활안전망 유형(상호배타, 취약 순서): 없음 > 공식(공공/민간) > 비공식(가족/지인)
+    #   주의: 우선순위 배정은 임의성이 있어 '참고용'. 핵심 분석은 도움없음 이항 +
+    #         데이터기반 군집화(src/clustering.py)로 대체한다.
+    if "help_living_none" in work.columns:
+        informal = pd.Series(False, index=work.index)
+        for c in ("help_living_family", "help_living_acq"):
+            if c in work.columns:
+                informal = informal | work[c].eq(1)
+        formal = pd.Series(False, index=work.index)
+        for c in ("help_living_public", "help_living_private"):
+            if c in work.columns:
+                formal = formal | work[c].eq(1)
+        none_help = work["help_living_none"].eq(1)
+        net = pd.Series(pd.NA, index=work.index, dtype="object")
+        net[informal] = "비공식(가족·지인)"
+        net[formal] = "공식(공공·민간)"
+        net[none_help] = "없음"
+        work["safety_net_type"] = net
+
+    # 금융부담/소득지원 보유 플래그 (>0)
+    flag_specs = [
+        ("debt_total", "has_debt"),
+        ("debt_living", "has_living_cost_debt"),
+        ("interest_monthly", "has_interest"),
+        ("transfer_private", "has_private_transfer"),
+        ("transfer_public", "has_public_transfer"),
+    ]
+    for src_col, new_col in flag_specs:
+        if src_col in work.columns:
+            work[new_col] = _gt0_flag(work[src_col])
+
+    # 사회적 고립 성향(외출빈도 7~8 = 방/집에서 거의 안 나옴) — 해석 주의
+    if "outing_freq" in work.columns:
+        work["isolation_flag"] = work["outing_freq"].isin([7, 8]).astype("Int64")
+
+    # 생활안전망 취약점수(0~6). 이전소득 없음은 가산 제외.
+    #   결측 플래그는 0으로 보아 가산(보수적), 해석은 쉬었음 집단 중심.
+    vuln_parts = []
+    if "not_parent_cohabit" in work.columns:
+        vuln_parts.append(work["not_parent_cohabit"].fillna(0))
+    if "family_help_flag" in work.columns:
+        vuln_parts.append((1 - work["family_help_flag"]).clip(lower=0))
+    if "no_help_flag" in work.columns:
+        vuln_parts.append(work["no_help_flag"].fillna(0))
+    for c in ["has_debt", "has_living_cost_debt", "has_interest"]:
+        if c in work.columns:
+            vuln_parts.append(work[c].astype("Float64").fillna(0))
+    if vuln_parts:
+        work["vuln_score"] = sum(vuln_parts).astype(int)
+
+
 def build_youth_2024_analysis(
     raw_path: Path = YOUTH_2024_RAW,
     save: bool = True,
@@ -535,67 +605,8 @@ def build_youth_2024_analysis(
         if src_col in work.columns:
             work[new_col] = work[src_col].map(mapping)
 
-    # 생활비 지원망 플래그 (복수응답 1=해당)
-    help_cols = [c for c in ["help_living_family", "help_living_acq",
-                             "help_living_public", "help_living_private"]
-                 if c in work.columns]
-    if help_cols:
-        work["has_help"] = work[help_cols].eq(1).any(axis=1).astype(int)
-    if "help_living_family" in work.columns:
-        work["family_help_flag"] = work["help_living_family"].eq(1).astype(int)
-    if "help_living_none" in work.columns:
-        work["no_help_flag"] = work["help_living_none"].eq(1).astype(int)
-    if "live_with_parents" in work.columns:
-        work["not_parent_cohabit"] = work["live_with_parents"].eq(2).astype(int)
-
-    # 생활안전망 유형(상호배타, 취약 순서): 없음 > 공식(공공/민간) > 비공식(가족/지인)
-    #   - 데이터상 '없음'은 다른 도움과 중복되지 않음(상호배타 확인됨)
-    if "help_living_none" in work.columns:
-        informal = pd.Series(False, index=work.index)
-        for c in ("help_living_family", "help_living_acq"):
-            if c in work.columns:
-                informal = informal | work[c].eq(1)
-        formal = pd.Series(False, index=work.index)
-        for c in ("help_living_public", "help_living_private"):
-            if c in work.columns:
-                formal = formal | work[c].eq(1)
-        none_help = work["help_living_none"].eq(1)
-        net = pd.Series(pd.NA, index=work.index, dtype="object")
-        net[informal] = "비공식(가족·지인)"
-        net[formal] = "공식(공공·민간)"   # 공식 활용은 비공식보다 취약신호로 우선
-        net[none_help] = "없음"
-        work["safety_net_type"] = net
-
-    # 금융부담/소득지원 보유 플래그 (>0)
-    flag_specs = [
-        ("debt_total", "has_debt"),
-        ("debt_living", "has_living_cost_debt"),
-        ("interest_monthly", "has_interest"),
-        ("transfer_private", "has_private_transfer"),
-        ("transfer_public", "has_public_transfer"),
-    ]
-    for src_col, new_col in flag_specs:
-        if src_col in work.columns:
-            work[new_col] = _gt0_flag(work[src_col])
-
-    # 사회적 고립 성향(외출빈도 7~8 = 방/집에서 거의 안 나옴) — 해석 주의
-    if "outing_freq" in work.columns:
-        work["isolation_flag"] = work["outing_freq"].isin([7, 8]).astype("Int64")
-
-    # (1-8) 생활안전망 취약점수(0~6). 이전소득 없음은 가산 제외.
-    #        결측 플래그는 0으로 보아 가산(보수적), 해석은 쉬었음 집단 중심.
-    vuln_parts = []
-    if "not_parent_cohabit" in work.columns:
-        vuln_parts.append(work["not_parent_cohabit"].fillna(0))
-    if "family_help_flag" in work.columns:
-        vuln_parts.append((1 - work["family_help_flag"]).clip(lower=0))
-    if "no_help_flag" in work.columns:
-        vuln_parts.append(work["no_help_flag"].fillna(0))
-    for c in ["has_debt", "has_living_cost_debt", "has_interest"]:
-        if c in work.columns:
-            vuln_parts.append(work[c].astype("Float64").fillna(0))
-    if vuln_parts:
-        work["vuln_score"] = sum(vuln_parts).astype(int)
+    # 지원망·금융부담·고립·취약점수 등 공통 파생 (2022/2024 동일 로직)
+    _derive_safety_and_vuln(work)
 
     # 조사연도 파생
     work["survey_year"] = 2024
@@ -604,6 +615,137 @@ def build_youth_2024_analysis(
     if save:
         save_processed_csv(work, "youth_life_2024_analysis.csv")
 
+    _print_validation(work, total_raw)
+    return work
+
+
+# ======================================================================
+# 청년삶실태조사 2022 분석용 전처리 (2024 재현성 비교용)
+#   코드북: data/codebook/2022년_청년삶실태조사_파일설계서.xlsx
+#   주의(2024와 다른 점):
+#     - 경제활동상태 코딩: 1=취업 / 2=실업 / 3=비경활  (2024는 1~8)
+#     - 컬럼명 표기: 부채/이자/소득 등은 '[청년(개인) 기준]' 대괄호 표기
+#     - 도움망: '...[복수응답_...]_1~_5' (1가족/2지인/3공공/4민간/5없음, 0·1 이항)
+#   쉬었음 식별: 경제활동상태==3(비경활) AND 지난 주 주된 활동상태==10(쉬었음)
+# ======================================================================
+YOUTH_2022_RAW = RAW_DIR / "youth_life" / "2022_총괄_20260527_89328.csv"
+
+YOUTH_2022_ANALYSIS_COLMAP: dict[str, str] = {
+    "gender": "성별",
+    "age_group": "연령",
+    "live_with_parents": "부모 동거 여부",
+    "econ_status": "경제활동상태",
+    "main_activity": "지난 주 주된 활동상태",
+    "ever_employed": "취업 경험",
+    "living_cost": "총생활비",
+    "transfer_private": "사적이전소득[청년(개인) 연간소득]",
+    "transfer_public": "공적이전소득[청년(개인) 연간소득]",
+    "debt_total": "부채총액[청년(개인) 기준]",
+    "debt_living": "생활비 부채[청년(개인) 기준]",
+    "debt_student": "학자금부채[청년(개인) 기준]",
+    "debt_housing": "주택 관련 부채[청년(개인) 기준]",
+    "interest_monthly": "(월평균)이자[청년(개인) 기준]",
+    "asset_financial": "금융재산[청년(개인) 기준]",
+    "life_satisfaction": "삶의 만족도(11점 척도)",
+    "happiness": "삶의 행복감 정도(11점 척도)",
+    "subjective_class": "본인의 소득 계층 인식",
+    "future_feasibility": "바라는 미래에 대한 실현 가능성",
+    "outing_freq": "외출 빈도",
+    "housing_tenure": "현재 주거 점유 형태",
+    "weight_person": "개인가중치",
+}
+# 도움망 복수응답(0/1): _1가족 _2지인 _3공공 _4민간 _5없음
+_HELP_2022_PREFIX = (
+    "어려움에 처했을 때 실제로 도움을 받을 수 있는 집단"
+    "[복수응답_이번 달 생활비가 부족할 때]"
+)
+YOUTH_2022_ANALYSIS_HELP_COLMAP: dict[str, str] = {
+    "help_living_family": f"{_HELP_2022_PREFIX}_1",
+    "help_living_acq": f"{_HELP_2022_PREFIX}_2",
+    "help_living_public": f"{_HELP_2022_PREFIX}_3",
+    "help_living_private": f"{_HELP_2022_PREFIX}_4",
+    "help_living_none": f"{_HELP_2022_PREFIX}_5",
+}
+
+
+def _add_labor_group_2022(df: pd.DataFrame) -> pd.Series:
+    """2022 경제활동상태(1취업/2실업/3비경활)+주된활동(10쉬었음)으로 그룹 라벨."""
+
+    def classify(row) -> str:
+        econ, main = row["econ_status"], row["main_activity"]
+        if econ == 1:
+            return "취업자"
+        if econ == 2:
+            return "실업자"
+        if econ == 3 and main == 10:
+            return "비경활_쉬었음"
+        if econ == 3:
+            return "비경활_기타"
+        return "기타"
+
+    return df.apply(classify, axis=1)
+
+
+def build_youth_2022_analysis(
+    raw_path: Path = YOUTH_2022_RAW,
+    save: bool = True,
+) -> pd.DataFrame | None:
+    """청년삶 2022 원본을 2024와 동일한 파생 규칙으로 전처리(재현성 비교용)."""
+    if not raw_path.exists():
+        print(f"[preprocess] 오류: 원본을 찾을 수 없습니다 -> {raw_path}")
+        return None
+    df = _read_csv_fallback(raw_path)
+    if df is None:
+        print(f"[preprocess] 오류: 인코딩을 해석할 수 없습니다 -> {raw_path}")
+        return None
+
+    total_raw = len(df)
+    full_map = {**YOUTH_2022_ANALYSIS_COLMAP, **YOUTH_2022_ANALYSIS_HELP_COLMAP}
+    rename, missing = _resolve_columns(df, full_map)
+    if missing:
+        print(f"[preprocess] 경고: 2022 원본에서 찾지 못한 변수 {len(missing)}개 -> {missing}")
+    essential = {"econ_status", "main_activity", "age_group"}
+    if not essential.issubset(set(rename.values())):
+        print(f"[preprocess] 오류: 필수 변수 누락 -> {essential - set(rename.values())}")
+        return None
+
+    work = df[list(rename)].rename(columns=rename).copy()
+
+    for col in _NUMERIC_COLS:
+        if col in work.columns:
+            work[col] = pd.to_numeric(work[col], errors="coerce")
+
+    # 청년 연령대 필터 (연령 1=19~24, 2=25~29, 3=30~34)
+    before = len(work)
+    work = work[work["age_group"].isin([1, 2, 3])].copy()
+    print(f"[preprocess] 2022 청년 연령 필터: {before:,} -> {len(work):,} 행")
+
+    # 노동상태 / 쉬었음 / 취업 / 실업
+    work["labor_group"] = _add_labor_group_2022(work)
+    work["is_employed"] = work["econ_status"].eq(1).astype(int)
+    work["is_unemployed"] = work["econ_status"].eq(2).astype(int)
+    work["is_rested"] = (
+        work["econ_status"].eq(3) & work["main_activity"].eq(10)
+    ).astype(int)
+
+    # 코드 라벨 (2024와 동일 코드체계 변수만)
+    label_specs = [
+        ("gender", _GENDER_LABEL, "gender_label"),
+        ("age_group", _AGE_LABEL, "age_label"),
+        ("live_with_parents", _PARENTS_LABEL, "parents_label"),
+        ("subjective_class", _CLASS_LABEL, "class_label"),
+        ("housing_tenure", _TENURE_LABEL, "housing_tenure_label"),
+        ("main_activity", _ACTIVITY_LABEL, "main_activity_label"),
+    ]
+    for src_col, mapping, new_col in label_specs:
+        if src_col in work.columns:
+            work[new_col] = work[src_col].map(mapping)
+
+    _derive_safety_and_vuln(work)
+    work["survey_year"] = 2022
+
+    if save:
+        save_processed_csv(work, "youth_life_2022_analysis.csv")
     _print_validation(work, total_raw)
     return work
 
@@ -786,6 +928,8 @@ def main() -> int:
     result = build_youth_2024_analysis()
     if result is None:
         return 1
+    print("\n[preprocess] 청년삶 2022 분석용 전처리 시작(재현성 비교)...")
+    build_youth_2022_analysis()
     print("\n[preprocess] EAPS 배경 집계 전처리 시작...")
     build_eaps_summary()
     print("\n[preprocess] KLIPS 26차 청년 보조검증 전처리 시작...")
