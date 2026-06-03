@@ -146,6 +146,54 @@ def line_dual_axis(
     return fig
 
 
+def line_stacked_trends(
+    df: pd.DataFrame,
+    x: str,
+    y_top: str,
+    y_bottom: str,
+    name_top: str,
+    name_bottom: str,
+    title: str = "추이",
+    top_title: str = "",
+    bottom_title: str = "",
+    color_top: str = "#F58518",
+    color_bottom: str = "#E45756",
+) -> go.Figure:
+    """두 지표를 위·아래 2단(공유 x축)으로 분리한 라인 차트.
+
+    이중 y축의 '어느 선이 어느 축?' 혼란을 없애기 위해 패널을 분리한다.
+    각 패널은 독립 y축을 가지며, 제목·선 색을 맞춰 직관적으로 읽힌다.
+    """
+    from plotly.subplots import make_subplots
+
+    fig = make_subplots(
+        rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.12,
+        subplot_titles=(name_top, name_bottom),
+    )
+    fig.add_trace(
+        go.Scatter(x=df[x], y=df[y_top], name=name_top, mode="lines+markers",
+                   line=dict(color=color_top, width=2.5)),
+        row=1, col=1,
+    )
+    fig.add_trace(
+        go.Scatter(x=df[x], y=df[y_bottom], name=name_bottom, mode="lines+markers",
+                   line=dict(color=color_bottom, width=2.5)),
+        row=2, col=1,
+    )
+    fig.update_layout(
+        title=title, title_x=0.0, margin=dict(l=20, r=20, t=70, b=20),
+        showlegend=False, height=520,
+    )
+    # 각 패널 제목 색을 선 색과 맞춤(어느 패널이 무엇인지 즉시 인지)
+    for ann, c in zip(fig.layout.annotations, (color_top, color_bottom)):
+        ann.font.color = c
+        ann.font.size = 14
+    fig.update_xaxes(title_text=x, row=2, col=1)
+    fig.update_yaxes(title_text=top_title, rangemode="tozero", row=1, col=1)
+    fig.update_yaxes(title_text=bottom_title, rangemode="tozero", row=2, col=1)
+    return fig
+
+
 def donut(
     labels: list[str],
     values: list[float],

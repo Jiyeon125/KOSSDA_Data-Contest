@@ -216,21 +216,27 @@ elif section == SECTIONS[1]:
         unemp = youth[youth["indicator"].str.contains("실업률", na=False)][["year", "value"]]
         rest = youth[youth["indicator"] == "쉬었음"][["year", "value"]]
         merged = unemp.merge(rest, on="year", suffixes=("_unemp", "_rest")).sort_values("year")
-        fig = charts.line_dual_axis(
-            merged, x="year", y_left="value_unemp", y_right="value_rest",
-            name_left="청년 실업률(%)", name_right="청년 쉬었음(천 명)",
+        fig = charts.line_stacked_trends(
+            merged, x="year", y_top="value_unemp", y_bottom="value_rest",
+            name_top="청년 실업률 (%)", name_bottom="청년 쉬었음 인구 (천 명)",
             title="청년(15–29) 실업률 vs 쉬었음 인구 추이",
-            left_title="실업률(%)", right_title="쉬었음(천 명)",
+            top_title="실업률(%)", bottom_title="쉬었음(천 명)",
+            color_top="#F58518", color_bottom="#E45756",
         )
         st.plotly_chart(fig, width="stretch")
-        st.caption("출처: 경제활동인구조사(EAPS) 집계표. 쉬었음 시계열은 2003년부터 제공.")
+        st.caption("출처: 경제활동인구조사(EAPS) 집계표. 쉬었음 시계열은 2003년부터 제공. "
+                   "위·아래 패널은 같은 연도축(가로)을 공유합니다.")
         method_note(
             """
 **자료** · 통계청 경제활동인구조사(EAPS) **공식 집계표**(개인 원자료 아님)를 연도×지표 long으로 변환한 표
 (`eaps_labor_status_summary`). 청년 **15–29세** 행만 사용.
-**두 선이 다른 축을 쓴다** · 왼쪽 축=**실업률(%)**, 오른쪽 축=**쉬었음 인구(천 명)**. 단위가 달라 한 축에 못 그린다.
-**두 축 모두 0부터** 시작하도록 고정해 기울기가 과장되지 않게 했다.
-**읽는 법** · 실업률(주황)은 2020년 이후 **하락**하는데, 쉬었음(빨강)은 **계속 증가** → "실업률만 보면 놓치는 청년층"이 존재한다는 배경 근거.
+**왜 위·아래로 나눴나** · 실업률(%)과 쉬었음 인구(천 명)는 **단위가 달라** 한 축에 겹쳐 그리면
+'어느 선이 어느 축'인지 헷갈린다. 그래서 **두 패널로 분리**하고 가로(연도)축만 공유한다.
+- **위 패널(주황)** = 청년 실업률(%) — 세로축 단위 %.
+- **아래 패널(빨강)** = 청년 쉬었음 인구(천 명) — 세로축 단위 천 명.
+**두 세로축 모두 0부터** 시작하도록 고정해 기울기 과장을 막았다.
+**읽는 법** · 위(실업률)는 2020년 이후 **하락**하는데, 아래(쉬었음)는 **계속 증가**
+→ "실업률만 보면 놓치는 청년층"이 존재한다는 배경 근거.
 """
         )
     except Exception as exc:  # noqa: BLE001
