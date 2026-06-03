@@ -117,7 +117,41 @@ def main() -> int:
     ax2.legend(fontsize=8); ax2.grid(axis="y", alpha=0.3)
     _save(fig, "15_cluster_outcomes.png")
 
-    print("\n[cluster] 완료. 그림: outputs/figures/13~15")
+    # --- Fig 19: PCA 2D 투영(군집이 실제로 갈라지는지) + 특징 적재 바이플롯 ---
+    coords, evr, load = cl.pca_project(labeled)
+    coords["유형"] = coords["cluster"].astype(int).map(names)
+    rng = np.random.default_rng(cl.RANDOM_STATE)
+    # 이항특징이라 점이 겹침 -> 약한 지터로 분포를 보이게 함
+    jx = coords["pc1"] + rng.normal(0, 0.06, len(coords))
+    jy = coords["pc2"] + rng.normal(0, 0.06, len(coords))
+    fig, ax = plt.subplots(figsize=(8.4, 6.6))
+    for name in order:
+        m = coords["유형"] == name
+        ax.scatter(jx[m], jy[m], s=18, alpha=0.45,
+                   color=CLUSTER_COLORS.get(name, "#999"), label=name,
+                   edgecolors="none")
+    # 군집 중심
+    for name in order:
+        m = coords["유형"] == name
+        ax.scatter(coords.loc[m, "pc1"].mean(), coords.loc[m, "pc2"].mean(),
+                   marker="X", s=240, color=CLUSTER_COLORS.get(name, "#999"),
+                   edgecolors="black", linewidths=1.4, zorder=5)
+    # 특징 적재 화살표(바이플롯) — 어떤 취약특징이 축을 만드는지
+    scale = 2.6
+    for feat, row in load.iterrows():
+        ax.arrow(0, 0, row["PC1"] * scale, row["PC2"] * scale,
+                 color="#333", alpha=0.7, head_width=0.08, length_includes_head=True)
+        ax.text(row["PC1"] * scale * 1.12, row["PC2"] * scale * 1.12, feat,
+                color="#222", fontsize=9, ha="center", va="center")
+    ax.axhline(0, color="#ccc", lw=0.8); ax.axvline(0, color="#ccc", lw=0.8)
+    ax.set_xlabel(f"PC1 ({evr[0]*100:.0f}% 설명)")
+    ax.set_ylabel(f"PC2 ({evr[1]*100:.0f}% 설명)")
+    ax.set_title(f"쉬었음 청년 군집 — PCA 2D 투영 (PC1+PC2 = {sum(evr[:2])*100:.0f}%)")
+    ax.legend(title="하위유형", loc="best"); ax.grid(alpha=0.25)
+    _save(fig, "19_cluster_pca.png")
+    print(f"[cluster] PCA 설명분산: PC1={evr[0]:.2%}, PC2={evr[1]:.2%}, 합={sum(evr[:2]):.2%}")
+
+    print("\n[cluster] 완료. 그림: outputs/figures/13~15, 19")
     return 0
 
 

@@ -12,6 +12,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
@@ -77,6 +78,30 @@ def cluster_rested(df: pd.DataFrame, k: int | None = None) -> tuple[pd.DataFrame
     out["cluster"] = pd.NA
     out.loc[mask, "cluster"] = km.labels_
     return out, k, scores
+
+
+def pca_project(df_labeled: pd.DataFrame) -> tuple[pd.DataFrame, np.ndarray, pd.DataFrame]:
+    """5개 취약특징을 표준화 후 PCA 2축으로 투영(군집을 2D로 보기 위함).
+
+    특징이 5개뿐이라 군집 자체는 PCA 없이 원특징으로 돌리지만(해석 유지),
+    '군집이 실제로 갈라지는지' 눈으로 확인하려면 차원축소가 필요하다.
+
+    Returns:
+        coords: pc1·pc2·cluster (mask 통과 행만)
+        evr:    각 주성분 설명분산비율
+        load:   특징×주성분 적재량(어떤 특징이 축을 만드는지)
+    """
+    Xv, mask = _feature_matrix(df_labeled)
+    Xs = StandardScaler().fit_transform(Xv)
+    pca = PCA(n_components=2)
+    pc = pca.fit_transform(Xs)
+    coords = df_labeled.loc[mask, ["cluster"]].copy()
+    coords["pc1"] = pc[:, 0]
+    coords["pc2"] = pc[:, 1]
+    load = pd.DataFrame(
+        pca.components_.T, index=list(FEATURES.values()), columns=["PC1", "PC2"]
+    )
+    return coords, pca.explained_variance_ratio_, load
 
 
 def profile(df_labeled: pd.DataFrame, weight_col: str = "weight_person") -> pd.DataFrame:
