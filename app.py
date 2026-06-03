@@ -19,6 +19,7 @@ import streamlit as st
 
 from src import queries
 from src import charts
+from src import clustering as clust
 
 st.set_page_config(
     page_title="청년 쉬었음 · 생활안전망 격차",
@@ -33,6 +34,9 @@ GROUP_ORDER = ["취업자", "실업자", "쉬었음", "비경활(기타)"]
 GROUP_COLORS = {"취업자": "#4C78A8", "실업자": "#F58518", "쉬었음": "#E45756", "비경활(기타)": "#9D9D9D"}
 NET_ORDER = ["비공식(가족·지인)", "공식(공공·민간)", "없음"]
 NET_COLORS = {"비공식(가족·지인)": "#4C78A8", "공식(공공·민간)": "#F58518", "없음": "#E45756"}
+CLUSTER_COLORS = {"안정형": "#4C78A8", "부채압박형": "#F58518", "사회적 고립형": "#E45756",
+                  "무지원형": "#E45756", "독립·저부담형": "#54A24B"}
+YEAR_COLORS = {"2022": "#9D7660", "2024": "#4C78A8"}
 
 
 # ----------------------------------------------------------------------
@@ -63,6 +67,25 @@ def load_eaps() -> pd.DataFrame:
 @st.cache_data(show_spinner=False)
 def load_klips() -> pd.DataFrame:
     return queries.run_query('SELECT * FROM klips_youth_2023;')
+
+
+@st.cache_data(show_spinner=False)
+def load_year(year: int) -> pd.DataFrame:
+    """연도별 청년삶 분석 테이블(존재할 때만)."""
+    return queries.run_query(f'SELECT * FROM youth_life_{year}_analysis;')
+
+
+@st.cache_data(show_spinner=False)
+def cluster_rested_cached(year: int = 2024):
+    """쉬었음 청년 데이터기반 군집(k=3) 결과를 캐시해서 반환한다."""
+    d = load_year(year)
+    r = d[d["is_rested"] == 1].copy()
+    labeled, k, scores = clust.cluster_rested(r, k=3)
+    prof = clust.profile(labeled)
+    names = clust.auto_name(prof)
+    prof["유형"] = prof["cluster"].map(names)
+    labeled["cluster_name"] = labeled["cluster"].map(names)
+    return labeled, prof, k, scores
 
 
 def method_note(md: str) -> None:
@@ -130,7 +153,8 @@ SECTIONS = [
     "S4 · ★내부 생활안전망 격차★",
     "S5 · 취약 누적 스펙트럼",
     "S6 · 보조검증 (KLIPS)",
-    "S7 · 결론 · 함의",
+    "S7 · 재현성·추세 (2022↔2024)",
+    "S8 · 결론 · 함의",
 ]
 section = st.sidebar.radio("분석 흐름", SECTIONS)
 st.sidebar.caption("비율·규모=가중 추정 / 검정 p·n=비가중")
@@ -300,52 +324,77 @@ elif section == SECTIONS[3]:
 # ======================================================================
 elif section == SECTIONS[4]:
     st.header("★ 쉬었음 '내부'의 생활안전망 격차 ★")
-    st.markdown("같은 쉬었음이라도 **두 갈래 취약**으로 갈린다: "
-                "**`없음`=고립형 사각지대**, **`공식`=부채 압박형**.")
+    st.markdown("분석자가 임의로 나누지 않고 **데이터(K-means 군집)** 가 쉬었음을 **3개 하위유형**으로 가른다: "
+                "**안정형(다수)** + 두 취약 갈래 **`사회적 고립형`·`부채압박형`**.")
 
-    share = queries.weighted_group_share(rested, "safety_net_type")
-    share["_o"] = share["집단"].map({g: i for i, g in enumerate(NET_ORDER)})
-    share = share.sort_values("_o")
-    fig_a = charts.grouped_bar(
-        share, x="집단", y="비율_가중(%)", color="집단",
-        title="생활안전망 유형 분포 (가중 비율, %)",
-        color_map=NET_COLORS, category_orders={"집단": NET_ORDER},
-        x_title="", y_title="비율(%)", text_format=".1f")
-    st.plotly_chart(fig_a, width="stretch")
-    st.dataframe(share[["집단", "표본n", "비율_가중(%)", "모집단추정(명)"]],
-                 width="stretch", hide_index=True)
+    labeled, prof, k, scores = cluster_rested_cached(2024)
+    cl_order = prof["유형"].tolist()
+    feat_labels = list(clust.FEATURES.values())
 
-    rates = _weighted_rates_by_group(
-        rested, "safety_net_type",
-        {"isolation_flag": "고립 경향", "has_debt": "부채 보유", "has_interest": "이자 부담"},
-        NET_ORDER)
-    fig_b = charts.grouped_bar(
-        rates, x="지표", y="값", color="집단", title="유형별 취약 지표 (가중 비율, %)",
-        color_map=NET_COLORS, category_orders={"집단": NET_ORDER},
-        x_title="", y_title="비율(%)", text_format=".1f")
-    st.plotly_chart(fig_b, width="stretch")
+    # (A) 유형별 규모
+    size_df = prof[["유형", "표본n", "모집단추정(명)"]].copy()
+    fig_size = charts.grouped_bar(
+        size_df, x="유형", y="표본n", color="유형", title="하위유형 규모 (표본 수)",
+        color_map=CLUSTER_COLORS, category_orders={"유형": cl_order},
+        x_title="", y_title="표본 수(명)", text_format=".0f")
+    st.plotly_chart(fig_size, width="stretch")
+    st.dataframe(size_df, width="stretch", hide_index=True)
 
-    means = _weighted_means_by_group(
-        rested, "safety_net_type",
-        {"life_satisfaction": "삶 만족도(0–10)", "subjective_class": "주관 계층(1–5)"},
-        NET_ORDER)
-    st.dataframe(means.pivot(index="집단", columns="지표", values="값").reindex(NET_ORDER),
-                 width="stretch")
+    # (B) 유형별 특징 프로파일(보유율 %)
+    prof_long = prof.melt(id_vars="유형", value_vars=feat_labels,
+                          var_name="특징", value_name="값")
+    fig_prof = charts.grouped_bar(
+        prof_long, x="특징", y="값", color="유형",
+        title="유형별 취약 특징 보유율 (%)",
+        color_map=CLUSTER_COLORS, category_orders={"유형": cl_order},
+        x_title="", y_title="보유율(%)", text_format=".0f")
+    st.plotly_chart(fig_prof, width="stretch")
 
-    b1 = queries.chi_square_compare(rested, "safety_net_type", "isolation_flag", "없음", "비공식(가족·지인)")
-    b2 = queries.mann_whitney_compare(rested, "safety_net_type", "subjective_class", "없음", "비공식(가족·지인)")
-    st.markdown(f"- **없음 vs 비공식** · 고립 경향: {_badge(b1, 'chi')}")
-    st.markdown(f"- **없음 vs 비공식** · 주관 계층: {_badge(b2, 'mw')}")
-    st.caption("'없음'·'공식' 유형은 소표본이라 검정보다 기술통계 중심으로 해석합니다.")
+    # (C) 유형별 주관 웰빙
+    well_long = prof.melt(id_vars="유형", value_vars=["삶 만족도(0-10)", "행복감(0-10)"],
+                          var_name="지표", value_name="값")
+    fig_well = charts.grouped_bar(
+        well_long, x="지표", y="값", color="유형",
+        title="유형별 주관 웰빙 (가중 평균, 0–10)",
+        color_map=CLUSTER_COLORS, category_orders={"유형": cl_order},
+        x_title="", y_title="평균(0–10)", text_format=".2f")
+    st.plotly_chart(fig_well, width="stretch")
+
+    # 검정: 군집 간 삶 만족도 차이 + 고립형 vs 나머지
+    from scipy import stats as _stats
+    ls = {c: pd.to_numeric(g["life_satisfaction"], errors="coerce").dropna()
+          for c, g in labeled.dropna(subset=["cluster"]).groupby("cluster_name")}
+    if len(ls) >= 2 and all(v.size >= 2 for v in ls.values()):
+        H, p_kw = _stats.kruskal(*ls.values())
+        st.markdown(f"- **3개 하위유형 간 삶 만족도 차이** · Kruskal-Wallis: "
+                    f"H={H:.1f}, p={p_kw:.3g} {'✅ 유의' if p_kw < 0.05 else '➖ 비유의'}")
+    iso_name = "사회적 고립형" if "사회적 고립형" in ls else ("무지원형" if "무지원형" in ls else None)
+    if iso_name:
+        iso = ls[iso_name]
+        rest_ls = pd.concat([v for n, v in ls.items() if n != iso_name])
+        if iso.size >= 2 and rest_ls.size >= 2:
+            U, p_u = _stats.mannwhitneyu(iso, rest_ls, alternative="two-sided")
+            r_rb = 1 - 2 * U / (iso.size * rest_ls.size)
+            st.markdown(f"- **{iso_name}(n={iso.size}) vs 나머지** · 삶 만족도: "
+                        f"p={p_u:.3g} · 효과크기 r={r_rb:.2f} ({queries._effect_label_r(r_rb)})")
+
+    with st.expander("참고: 휴리스틱 유형(safety_net_type)·도움원천 비배타 분포", expanded=False):
+        st.caption("초기엔 도움원천을 '없음→공식→비공식' 우선순위로 1유형에 강제배정했으나, "
+                   "순서가 임의적이라 핵심 분석은 위 데이터기반 군집으로 대체했습니다. 아래는 참고용입니다.")
+        share = queries.weighted_group_share(rested, "safety_net_type")
+        share["_o"] = share["집단"].map({g: i for i, g in enumerate(NET_ORDER)})
+        share = share.sort_values("_o")
+        st.dataframe(share[["집단", "표본n", "비율_가중(%)", "모집단추정(명)"]],
+                     width="stretch", hide_index=True)
     method_note(
         """
-**생활안전망 유형(`safety_net_type`)** · 위 S3 문항을 상호배타 3유형으로 정리.
-한 사람이 여러 곳을 골라도 **취약 우선순위(없음 → 공식 → 비공식)** 로 한 유형에만 배정.
-**위 그래프** · ①유형 분포(가중 %·모집단 추정) ②유형별 취약지표(가중 %) ③유형별 웰빙(가중 평균 표).
-**고립 경향** · 외출빈도가 매우 낮은(거의 집/방에서 안 나옴) 응답 = 사회적 고립 대리지표.
-**검정** · '없음' vs '비공식'을 카이제곱(고립)·Mann-Whitney(계층)로 비교. p·효과크기는 **비가중 표본수** 기준.
-**핵심 해석** · `없음`=고립↑(사각지대형), `공식`=부채·이자↑(부채압박형) → **취약 메커니즘이 두 갈래로 다르다.**
-**주의** · '없음'(89명)·'공식'(45명)은 표본이 작아 기대빈도<5(⚠배지) → 단정 대신 경향으로 서술.
+**데이터기반 하위유형(군집화)** · 분석자가 손으로 나누지 않고, 5개 취약지표
+(지원망 없음·부모 비동거·부채·이자·고립)를 표준화해 **K-means**가 군집을 만든다.
+**군집 수(k=3)** · 엘보우(WCSS 꺾임)+실루엣+해석가능성으로 3 선택(`scripts/cluster_rested.py`).
+**그래프** · ①유형별 규모 ②유형별 취약특징 보유율(%) ③유형별 가중 웰빙 평균.
+**검정** · 유형 간 삶 만족도 차이는 **Kruskal-Wallis**, 고립형 vs 나머지는 **Mann-Whitney U**(효과크기 r). p·n은 비가중.
+**핵심** · 안정형(약 83%)이 다수지만, **사회적 고립형**(웰빙 급락)과 **부채압박형**(부채·이자↑)이
+서로 다른 축에서 분리된다 → 취약 메커니즘이 **두 갈래**. (2022에서도 같은 3유형이 재현 — S7 참고)
 """
     )
 
@@ -429,7 +478,82 @@ elif section == SECTIONS[6]:
 
 
 # ======================================================================
-# S7 결론
+# S7 재현성·추세 (2022 ↔ 2024)
+# ======================================================================
+elif section == SECTIONS[7]:
+    st.header("재현성·추세 — 2022 vs 2024")
+    st.markdown("같은 정의·같은 파생규칙으로 **2022년 청년삶**을 처리해, 2024 결과가 "
+                "**우연이 아니라 재현되는 추세**임을 확인한다.")
+    try:
+        d22, d24 = load_year(2022), load_year(2024)
+        r22 = d22[d22["is_rested"] == 1].copy()
+        r24 = d24[d24["is_rested"] == 1].copy()
+
+        # (A) 쉬었음 비중 추세
+        rows = []
+        for yr, d in (("2022", d22), ("2024", d24)):
+            s = queries.weighted_share(d, "is_rested")
+            rows.append({"연도": yr, "값": s["비율_가중(%)"], "n": s["표본n"],
+                         "모집단": s["모집단추정(명)"]})
+        size_df = pd.DataFrame(rows)
+        fig_s = charts.grouped_bar(
+            size_df, x="연도", y="값", color="연도",
+            title="청년 대비 쉬었음 비중 (가중 %) — 2022 vs 2024",
+            color_map=YEAR_COLORS, category_orders={"연도": ["2022", "2024"]},
+            x_title="", y_title="비중(%)", text_format=".1f")
+        st.plotly_chart(fig_s, width="stretch")
+
+        # (B) 쉬었음 내부 취약지표 추세 + 연도 간 검정
+        both = pd.concat([r22, r24], ignore_index=True)
+        flags = {"no_help_flag": "지원망 없음", "not_parent_cohabit": "부모 비동거",
+                 "has_debt": "부채 보유", "has_interest": "이자 부담",
+                 "isolation_flag": "고립 경향"}
+        rows = []
+        notes = []
+        for col, label in flags.items():
+            w22 = queries.weighted_share(r22, col)["비율_가중(%)"]
+            w24 = queries.weighted_share(r24, col)["비율_가중(%)"]
+            rows.append({"지표": label, "연도": "2022", "값": w22})
+            rows.append({"지표": label, "연도": "2024", "값": w24})
+            t = queries.chi_square_compare(both, "survey_year", col, 2022, 2024)
+            sig = "✅유의" if (t.get("p") is not None and t["p"] < 0.05) else "➖비유의"
+            notes.append(f"- **{label}** · 2022 {w22}% → 2024 {w24}% · "
+                         f"p={t['p']:.3g} {sig}" if t.get("p") is not None
+                         else f"- **{label}** · 2022 {w22}% → 2024 {w24}%")
+        vdf = pd.DataFrame(rows)
+        fig_v = charts.grouped_bar(
+            vdf, x="지표", y="값", color="연도",
+            title="쉬었음 내부 취약지표 (가중 %) — 2022 vs 2024",
+            color_map=YEAR_COLORS, category_orders={"연도": ["2022", "2024"]},
+            x_title="", y_title="보유율(%)", text_format=".1f")
+        st.plotly_chart(fig_v, width="stretch")
+        st.markdown("\n".join(notes))
+
+        # (C) 군집 하위유형 재현성
+        _, prof22, _, _ = cluster_rested_cached(2022)
+        st.subheader("취약 하위유형 재현성 (2022 군집화)")
+        st.dataframe(prof22[["유형", "표본n", "지원망 없음", "부채 보유", "이자 부담",
+                             "고립 경향", "삶 만족도(0-10)"]],
+                     width="stretch", hide_index=True)
+        st.caption("2022에서도 안정형 + (지원망없음·고립)취약형 + 부채압박형의 3유형이 재현되며, "
+                   "취약유형의 삶 만족도가 가장 낮은 패턴도 반복됩니다.")
+        method_note(
+            """
+**왜 2022를 보나** · 한 해(2024) 결과만으로는 우연일 수 있어, **동일 정의·동일 전처리**로 2022를 처리해
+방향이 재현되는지 본다(`build_youth_2022_analysis`, `scripts/compare_years.py`).
+**주의(2022 코딩 차이)** · 2022는 경제활동상태가 1취업/2실업/3비경활로, 2024(1~8)와 코드가 달라
+별도 매핑했으나 **쉬었음 정의(비경활&주된활동=쉬었음)는 동일**하게 맞췄다.
+**검정** · 연도 간 취약지표 비율 차이는 **카이제곱**(비가중 표본). 효과크기는 작아도 방향이 일관.
+**핵심** · ①쉬었음 비중↑(5.2→7.2%) ②내부 취약(지원망없음·부채·이자·고립) 모두↑·유의
+③3개 하위유형 재현 → **"쉬었음이 늘었고 그 안의 취약층도 두꺼워졌다"**는 추세.
+"""
+        )
+    except Exception as exc:  # noqa: BLE001
+        st.error(f"2022 비교 데이터를 불러오지 못했습니다(테이블 적재 필요): {exc}")
+
+
+# ======================================================================
+# S8 결론
 # ======================================================================
 else:
     st.header("결론 · 정책 함의")
@@ -439,18 +563,20 @@ else:
 ### 핵심 요약
 - **쉬었음 ≠ 실업자**: 별개의 비경제활동 집단으로 다뤄야 한다.
 - **다수는 가족지원망(약 85%)** 으로 버티지만, 내부는 균질하지 않다.
-- **두 갈래 취약 하위유형**:
-  - **`도움없음`(약 {no_help['모집단추정(명)']/10000:.1f}만 명, {no_help['비율_가중(%)']}%)** → 사회적 **고립형 사각지대**
-  - **`공식의존`** → **부채·이자 압박형**
+- **데이터(군집)가 가른 3개 하위유형**: 안정형(약 83%) 외에 두 취약 갈래 —
+  - **사회적 고립형** → 도움받을 곳 없음·고립↑, **삶 만족도 급락**(사각지대)
+  - **부채압박형** → 부채·이자 부담↑
+  - (`도움없음` 약 {no_help['모집단추정(명)']/10000:.1f}만 명, {no_help['비율_가중(%)']}%)
 - 취약요소가 **누적될수록** 삶 만족·행복·계층인식이 유의하게 낮아진다.
+- **2022→2024 재현**: 쉬었음 규모↑ + 내부 취약↑ + 동일 3유형 재현(우연 아님).
 
 ### 정책 함의
 - '쉬었음'을 단일 범주로 보지 말고, **고립형 / 부채압박형을 구분해 타게팅**.
-- 사각지대(`도움없음`)는 소득지원보다 **사회적 연결·접촉 기반 개입**이 필요.
+- 사각지대(고립형)는 소득지원보다 **사회적 연결·접촉 기반 개입**이 필요.
 """
     )
-    st.caption("※ 한계: 소표본 유형(없음·공식)·고립 지표는 기대빈도<5로 해석 주의, "
-               "future_feasibility 방향은 코드북 확인 후 확정 예정.")
+    st.caption("※ 한계: 소표본 하위유형(고립형 등)은 효과크기를 함께 보고 경향으로 해석, "
+               "KLIPS는 방향성 보조, future_feasibility 방향은 코드북 확인 후 확정 예정.")
 
 st.divider()
 st.caption("표시 수치는 청년삶 2024·EAPS·KLIPS 실데이터에서 계산. © 2026 경영정보처리론 · KOSSDA 공모전")
