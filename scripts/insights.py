@@ -75,16 +75,21 @@ def _save(fig, name: str) -> Path:
 def fig_eaps_trends(eaps: pd.DataFrame) -> None:
     rested = eaps[eaps["indicator"] == "쉬었음"]
     fig, ax = plt.subplots(figsize=(8, 4.5))
-    for age in ("계", "15 - 29세", "30 - 39세"):
+    # '계'(전 연령 합계)는 40·50·60대까지 포함해 청년 분석을 가려 제외.
+    # 청년삶 타깃(19~34)은 아래 두 밴드(15-29 · 30-39) 사이에 위치.
+    bands = {"15 - 29세": "#4C78A8", "30 - 39세": "#54A24B"}
+    for age, color in bands.items():
         sub = rested[rested["age_group"] == age].sort_values("year")
         if sub.empty:
             continue
-        ax.plot(sub["year"], sub["value"], marker="o", ms=3, label=age)
-    ax.set_title("쉬었음 인구 추이 (EAPS, 천 명)")
+        ax.plot(sub["year"], sub["value"], marker="o", ms=3, label=age, color=color)
+    ax.set_title("청년·30대 '쉬었음' 인구 추이 (EAPS, 천 명)")
     ax.set_xlabel("연도")
     ax.set_ylabel("쉬었음 인구 (천 명)")
-    ax.legend()
+    ax.legend(title="연령대")
     ax.grid(alpha=0.3)
+    ax.text(0.99, -0.18, "※ 전 연령 합계(계)는 40·50·60대 포함이라 청년 분석에서 제외",
+            transform=ax.transAxes, ha="right", va="top", fontsize=8, color="#666")
     _save(fig, "01_eaps_rested_trend.png")
 
     # 청년 실업률 vs 전체
