@@ -548,6 +548,24 @@ def build_youth_2024_analysis(
     if "live_with_parents" in work.columns:
         work["not_parent_cohabit"] = work["live_with_parents"].eq(2).astype(int)
 
+    # 생활안전망 유형(상호배타, 취약 순서): 없음 > 공식(공공/민간) > 비공식(가족/지인)
+    #   - 데이터상 '없음'은 다른 도움과 중복되지 않음(상호배타 확인됨)
+    if "help_living_none" in work.columns:
+        informal = pd.Series(False, index=work.index)
+        for c in ("help_living_family", "help_living_acq"):
+            if c in work.columns:
+                informal = informal | work[c].eq(1)
+        formal = pd.Series(False, index=work.index)
+        for c in ("help_living_public", "help_living_private"):
+            if c in work.columns:
+                formal = formal | work[c].eq(1)
+        none_help = work["help_living_none"].eq(1)
+        net = pd.Series(pd.NA, index=work.index, dtype="object")
+        net[informal] = "비공식(가족·지인)"
+        net[formal] = "공식(공공·민간)"   # 공식 활용은 비공식보다 취약신호로 우선
+        net[none_help] = "없음"
+        work["safety_net_type"] = net
+
     # 금융부담/소득지원 보유 플래그 (>0)
     flag_specs = [
         ("debt_total", "has_debt"),

@@ -167,6 +167,71 @@ def group_means(
 
 
 # ----------------------------------------------------------------------
+# 가중 추정 헬퍼 (가중=모집단 대표 비율/규모, 검정 n 은 비가중 사용)
+#   weight_person: 응답자 1명이 대표하는 모집단 인원 수
+# ----------------------------------------------------------------------
+WEIGHT_COL = "weight_person"
+
+
+def weighted_share(
+    df: pd.DataFrame,
+    flag_col: str,
+    weight_col: str = WEIGHT_COL,
+) -> dict:
+    """이항 플래그(0/1)의 가중 비율(%)과 모집단 추정 규모(명)를 계산한다."""
+    f = pd.to_numeric(df[flag_col], errors="coerce")
+    w = pd.to_numeric(df[weight_col], errors="coerce")
+    mask = f.notna() & w.notna()
+    f, w = f[mask], w[mask]
+    if w.sum() == 0:
+        return {"비율_가중(%)": None, "비율_비가중(%)": None, "모집단추정(명)": 0, "표본n": 0}
+    return {
+        "비율_가중(%)": round(float((w[f == 1].sum()) / w.sum() * 100), 1),
+        "비율_비가중(%)": round(float((f == 1).mean() * 100), 1),
+        "모집단추정(명)": int(round(float(w[f == 1].sum()))),
+        "표본n": int((f == 1).sum()),
+    }
+
+
+def weighted_mean(
+    df: pd.DataFrame,
+    value_col: str,
+    weight_col: str = WEIGHT_COL,
+) -> float | None:
+    """수치형 변수의 가중 평균."""
+    v = pd.to_numeric(df[value_col], errors="coerce")
+    w = pd.to_numeric(df[weight_col], errors="coerce")
+    mask = v.notna() & w.notna()
+    v, w = v[mask], w[mask]
+    if w.sum() == 0:
+        return None
+    return round(float((v * w).sum() / w.sum()), 2)
+
+
+def weighted_group_share(
+    df: pd.DataFrame,
+    group_col: str,
+    weight_col: str = WEIGHT_COL,
+) -> pd.DataFrame:
+    """범주형 그룹별 가중 비율(%)·모집단 추정 규모·표본수를 반환한다."""
+    w = pd.to_numeric(df[weight_col], errors="coerce")
+    sub = df[[group_col]].copy()
+    sub["_w"] = w
+    sub = sub.dropna(subset=[group_col, "_w"])
+    total_w = sub["_w"].sum()
+    rows = []
+    for g, gdf in sub.groupby(group_col):
+        rows.append({
+            "집단": g,
+            "표본n": int(len(gdf)),
+            "비율_가중(%)": round(float(gdf["_w"].sum() / total_w * 100), 1) if total_w else None,
+            "비율_비가중(%)": round(float(len(gdf) / len(sub) * 100), 1),
+            "모집단추정(명)": int(round(float(gdf["_w"].sum()))),
+        })
+    return pd.DataFrame(rows)
+
+
+# ----------------------------------------------------------------------
 # 통계 검정 헬퍼 (공모전: 유의성·효과크기 보고용)
 #   - 비모수 검정(Mann-Whitney U)으로 두 집단의 연속형 변수 비교
 #   - 카이제곱 검정으로 두 집단의 비율(이항 플래그) 비교
