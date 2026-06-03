@@ -17,17 +17,18 @@
 - [x] `data/processed/youth_life_2024_analysis.csv` 생성 (15,098행)
 - [x] SQLite `youth_life_2024_analysis` 테이블 적재
 - [ ] 청년삶 2024 취약점수 가중치/임계값 분포 검토 후 확정
-- [ ] EAPS 집계표 wide→long (`labor_status_summary`)
-- [ ] KLIPS 코드북 변수 매핑 확정(연령/성별/경활/소득/부채 변수명)
-- [ ] KLIPS 26p/26h 전처리 + `hhid26` 조인 (`klips_youth_joined`)
+- [x] EAPS 집계표 wide→long (`eaps_labor_status_summary`, 2,570행, 2000~2025)
+- [x] KLIPS 코드북 변수 매핑 확정(`scripts/klips_map.py`, 연령/성별/경활/소득/부채)
+- [x] KLIPS 26p/26h 전처리 + `hhid26` 조인 (`klips_youth_2023`, 청년 3,818명)
 - [ ] (선택) 청년삶 2022 비교 테이블
 
 ## 2. 분석 / 통계검증
-- [ ] 집단비교 검정 헬퍼(Mann-Whitney/카이제곱 + 효과크기) `queries.py`
-- [ ] 쉬었음 내부 비교(부모동거/도움유무/부채여부) 유의성·효과크기 보고
+- [x] 집단비교 검정 헬퍼(Mann-Whitney/카이제곱 + 효과크기) `queries.py`
+- [x] 쉬었음 내부 비교(부모동거/도움유무) 유의성·효과크기 보고 (`scripts/insights.py`)
 - [ ] (선택) 생활안전망 유형화(점수/군집)
 
 ## 3. 시각화 / 산출물
+- [x] 인사이트용 경량 시각화 9종 `outputs/figures/` (`scripts/insights.py`)
 - [ ] Streamlit 분석 흐름 화면(개요→배경→메인→보조검증→격차→결론)
 - [ ] 공모전 PPT 10장 / 수업 대시보드 페이지 구성
 
@@ -44,4 +45,5 @@
 
 | 시각(KST) | 메시지 | 프롬프트 요약 |
 | --- | --- | --- |
+| 2026-06-03 12:24 | feat: EAPS/KLIPS 전처리 + 통계검정 헬퍼 + 인사이트 시각화 9종 | 쉬었음 집단 비교 시각화/검정, EAPS 추이 long변환, KLIPS 26차(2023) 변수매핑·청년 보조검증 추출 |
 | 2026-06-03 01:44 | feat: 청년삶 2024 분석 전처리 + 설계문서 + 커밋 안전점검 자동화 | 문서 기반 청년삶2024 전처리(youth_life_2024_analysis) 작성, PROGRESS 체크리스트 및 GitHub 업로드 안전점검/자동커밋 스크립트 구축 |

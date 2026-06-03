@@ -9,6 +9,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 # 프로젝트 루트 기준 경로 (Windows 호환을 위해 pathlib 사용)
@@ -163,6 +164,116 @@ def group_means(
         df[c] = pd.to_numeric(df[c], errors="coerce")
     agg = df.groupby(group_col)[value_cols].mean().round(1).reset_index()
     return agg
+
+
+# ----------------------------------------------------------------------
+# 통계 검정 헬퍼 (공모전: 유의성·효과크기 보고용)
+#   - 비모수 검정(Mann-Whitney U)으로 두 집단의 연속형 변수 비교
+#   - 카이제곱 검정으로 두 집단의 비율(이항 플래그) 비교
+#   - 효과크기(rank-biserial / Cramér's V)와 표본수를 함께 보고
+# ----------------------------------------------------------------------
+ANALYSIS_TABLE = "youth_life_2024_analysis"
+
+
+def _effect_label_r(r: float) -> str:
+    """효과크기 |r| 해석 라벨(Cohen 관행)."""
+    a = abs(r)
+    if a < 0.1:
+        return "무시할 수준"
+    if a < 0.3:
+        return "작음"
+    if a < 0.5:
+        return "중간"
+    return "큼"
+
+
+def mann_whitney_compare(
+    df: pd.DataFrame,
+    group_col: str,
+    value_col: str,
+    group_a,
+    group_b,
+) -> dict:
+    """두 집단의 연속형 변수 차이를 Mann-Whitney U 로 검정한다.
+
+    효과크기는 rank-biserial correlation(=1-2U/(n1·n2))로 보고한다.
+    """
+    from scipy import stats  # 지연 import (앱 시작 비용 절감)
+
+    a = pd.to_numeric(df.loc[df[group_col] == group_a, value_col], errors="coerce").dropna()
+    b = pd.to_numeric(df.loc[df[group_col] == group_b, value_col], errors="coerce").dropna()
+    res: dict = {
+        "변수": value_col,
+        "집단A": str(group_a),
+        "집단B": str(group_b),
+        "n_A": int(a.size),
+        "n_B": int(b.size),
+        "중앙값_A": round(float(a.median()), 1) if not a.empty else None,
+        "중앙값_B": round(float(b.median()), 1) if not b.empty else None,
+        "평균_A": round(float(a.mean()), 1) if not a.empty else None,
+        "평균_B": round(float(b.mean()), 1) if not b.empty else None,
+    }
+    if a.size < 2 or b.size < 2:
+        res.update({"U": None, "p": None, "효과크기r": None, "효과해석": "표본부족", "유의": ""})
+        return res
+
+    u, p = stats.mannwhitneyu(a, b, alternative="two-sided")
+    r_rb = 1.0 - (2.0 * u) / (a.size * b.size)
+    res.update({
+        "U": round(float(u), 1),
+        "p": float(p),
+        "효과크기r": round(float(r_rb), 3),
+        "효과해석": _effect_label_r(r_rb),
+        "유의": "유의(p<.05)" if p < 0.05 else "비유의",
+    })
+    return res
+
+
+def chi_square_compare(
+    df: pd.DataFrame,
+    group_col: str,
+    flag_col: str,
+    group_a,
+    group_b,
+) -> dict:
+    """두 집단의 이항 플래그(0/1) 비율 차이를 카이제곱으로 검정한다.
+
+    효과크기는 2x2 Cramér's V(=phi)로 보고한다. 기대빈도가 작으면 경고한다.
+    """
+    from scipy import stats
+
+    sub = df[df[group_col].isin([group_a, group_b])][[group_col, flag_col]].copy()
+    sub[flag_col] = pd.to_numeric(sub[flag_col], errors="coerce")
+    sub = sub.dropna()
+    res: dict = {"변수": flag_col, "집단A": str(group_a), "집단B": str(group_b)}
+    if sub.empty:
+        res.update({"비율A(%)": None, "비율B(%)": None, "p": None, "효과크기V": None, "유의": "표본부족"})
+        return res
+
+    a = sub.loc[sub[group_col] == group_a, flag_col]
+    b = sub.loc[sub[group_col] == group_b, flag_col]
+    res["n_A"], res["n_B"] = int(a.size), int(b.size)
+    res["비율A(%)"] = round(float(a.mean() * 100), 1) if a.size else None
+    res["비율B(%)"] = round(float(b.mean() * 100), 1) if b.size else None
+
+    ct = pd.crosstab(sub[group_col], sub[flag_col])
+    if ct.shape != (2, 2):
+        res.update({"p": None, "효과크기V": None, "유의": "2x2 아님"})
+        return res
+
+    chi2, p, _, expected = stats.chi2_contingency(ct, correction=True)
+    n = ct.values.sum()
+    v = float(np.sqrt(chi2 / n)) if n else 0.0
+    res.update({
+        "p": float(p),
+        "효과크기V": round(v, 3),
+        "효과해석": _effect_label_r(v),
+        "최소기대빈도": round(float(expected.min()), 1),
+        "유의": "유의(p<.05)" if p < 0.05 else "비유의",
+    })
+    if expected.min() < 5:
+        res["경고"] = "기대빈도<5 (해석 주의)"
+    return res
 
 
 if __name__ == "__main__":

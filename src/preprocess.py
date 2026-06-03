@@ -590,16 +590,188 @@ def build_youth_2024_analysis(
     return work
 
 
+# ======================================================================
+# 경제활동인구조사(EAPS) 집계표 -> tidy long 변환 (배경 추이용)
+#   산출물: data/processed/eaps_labor_status_summary.csv
+#           -> build_db.py 가 eaps_labor_status_summary 테이블로 적재
+# ======================================================================
+EAPS_DIR = RAW_DIR / "eaps"
+_PCT_INDICATORS = ("참가율", "실업률", "고용률")
+
+
+def _eaps_to_long(path: Path) -> pd.DataFrame:
+    """EAPS '데이터' 시트를 tidy long 으로 변환한다(파일 유형 자동 판별)."""
+    try:
+        raw = pd.read_excel(path, sheet_name="데이터", header=None)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[preprocess] EAPS 읽기 실패: {path.name} -> {exc}")
+        return pd.DataFrame()
+
+    name = path.name
+    records: list[dict] = []
+
+    if "활동상태" in name:  # 쉬었음: col0=연령, col1=활동상태, col2..=연도
+        years = raw.iloc[0].tolist()
+        for _, r in raw.iloc[1:].iterrows():
+            age = r.iloc[0]
+            if pd.isna(age):
+                continue
+            activity = str(r.iloc[1]).strip()
+            for j in range(2, len(r)):
+                y, val = years[j], r.iloc[j]
+                if pd.isna(y) or pd.isna(val):
+                    continue
+                records.append({"age_group": str(age).strip(), "year": int(float(y)),
+                                "indicator": activity, "value": float(val), "unit": "천명"})
+    elif "총괄" in name:  # 다지표: row0=연도(반복), row1=지표명, row2..=데이터
+        years, inds = raw.iloc[0].tolist(), raw.iloc[1].tolist()
+        for _, r in raw.iloc[2:].iterrows():
+            age = r.iloc[0]
+            if pd.isna(age):
+                continue
+            for j in range(1, len(r)):
+                y, ind, val = years[j], inds[j], r.iloc[j]
+                if pd.isna(y) or pd.isna(ind) or pd.isna(val):
+                    continue
+                ind = str(ind).strip()
+                unit = "%" if any(k in ind for k in _PCT_INDICATORS) else "천명"
+                records.append({"age_group": str(age).strip(), "year": int(float(y)),
+                                "indicator": ind, "value": float(val), "unit": unit})
+    else:  # 단일지표(비경제활동인구): col0=연령, col1..=연도
+        years = raw.iloc[0].tolist()
+        for _, r in raw.iloc[1:].iterrows():
+            age = r.iloc[0]
+            if pd.isna(age):
+                continue
+            for j in range(1, len(r)):
+                y, val = years[j], r.iloc[j]
+                if pd.isna(y) or pd.isna(val):
+                    continue
+                records.append({"age_group": str(age).strip(), "year": int(float(y)),
+                                "indicator": "비경제활동인구", "value": float(val), "unit": "천명"})
+
+    df = pd.DataFrame(records)
+    if not df.empty:
+        df["source"] = name
+    return df
+
+
+def build_eaps_summary(save: bool = True) -> pd.DataFrame | None:
+    """EAPS 집계표(xlsx) 들을 하나의 tidy long 테이블로 합친다."""
+    if not EAPS_DIR.exists():
+        print(f"[preprocess] 오류: EAPS 폴더가 없습니다 -> {EAPS_DIR}")
+        return None
+    files = sorted(EAPS_DIR.glob("*.xlsx"))
+    if not files:
+        print(f"[preprocess] 오류: EAPS xlsx 가 없습니다 -> {EAPS_DIR}")
+        return None
+
+    parts = [_eaps_to_long(f) for f in files]
+    parts = [p for p in parts if not p.empty]
+    if not parts:
+        print("[preprocess] EAPS 변환 결과가 비었습니다.")
+        return None
+
+    out = pd.concat(parts, ignore_index=True)
+    out = out[["source", "age_group", "indicator", "year", "value", "unit"]]
+    if save:
+        save_processed_csv(out, "eaps_labor_status_summary.csv")
+    print(f"[preprocess] EAPS long 변환 완료: {len(out):,} 행, "
+          f"연령대 {out['age_group'].nunique()}종, 지표 {out['indicator'].nunique()}종")
+    return out
+
+
+# ======================================================================
+# KLIPS 26차(2023) 청년 보조검증용 추출
+#   개인(26p) + 가구(26h) 를 hhid26 으로 결합, 청년(19-34) 필터.
+#   주의: KLIPS 에는 청년 '쉬었음' 사유 변수(p262809)가 거의 비어 있어
+#         쉬었음 단독 식별이 불가. 취업 vs 미취업(실업+비경활) 대조만 가능.
+# ======================================================================
+KLIPS_DIR = RAW_DIR / "klips"
+KLIPS_PERSON_26 = KLIPS_DIR / "kor_data_CUM0066_klips26p.xlsx"
+KLIPS_HH_26 = KLIPS_DIR / "kor_data_CUM0066_klips26h.xlsx"
+
+# 변수설명은 docs(코드북 매핑) 참고. (-1 등 음수 = 무응답/비해당 -> 결측)
+_KLIPS_P_COLS = {
+    "pid": "pid", "hhid26": "hhid26",
+    "p260101": "sex", "p260107": "age", "p260211": "econ_status_code",
+    "p261702": "labor_income_year", "p265501": "marital_code",
+}
+_KLIPS_H_COLS = {
+    "hhid26": "hhid26", "h260150": "hh_size",
+    "h262301": "living_cost_month", "h262632": "debt_any_code",
+}
+
+
+def _klips_to_na(series: pd.Series) -> pd.Series:
+    """KLIPS 음수 코드(-1 등 무응답/비해당)를 결측 처리한 수치형."""
+    s = pd.to_numeric(series, errors="coerce")
+    return s.where(s >= 0)
+
+
+def build_klips_youth(save: bool = True) -> pd.DataFrame | None:
+    """KLIPS 26차 청년(19-34) 개인-가구 결합 추출표를 만든다."""
+    if not KLIPS_PERSON_26.exists() or not KLIPS_HH_26.exists():
+        print(f"[preprocess] 오류: KLIPS 26차 파일이 없습니다 -> {KLIPS_DIR}")
+        return None
+    try:
+        p = pd.read_excel(KLIPS_PERSON_26, engine="calamine", usecols=list(_KLIPS_P_COLS))
+        h = pd.read_excel(KLIPS_HH_26, engine="calamine", usecols=list(_KLIPS_H_COLS))
+    except Exception as exc:  # noqa: BLE001
+        print(f"[preprocess] KLIPS 읽기 실패: {exc}")
+        return None
+
+    p = p.rename(columns=_KLIPS_P_COLS)
+    h = h.rename(columns=_KLIPS_H_COLS)
+
+    p["age"] = _klips_to_na(p["age"])
+    youth = p[(p["age"] >= 19) & (p["age"] <= 34)].copy()
+
+    # 가구 변수 결합 (hhid26 기준)
+    df = youth.merge(h, on="hhid26", how="left", suffixes=("", "_h"))
+
+    # 코드 -> 파생변수 (KLIPS 표준: 취업상태 1=취업,2=실업,3=비경활 / 부채유무 1=있음,2=없음)
+    df["econ_status_code"] = _klips_to_na(df["econ_status_code"])
+    df["is_employed_klips"] = (df["econ_status_code"] == 1).astype("Int64")
+    df["is_nonemployed_klips"] = df["econ_status_code"].isin([2, 3]).astype("Int64")
+    df.loc[df["econ_status_code"].isna(), ["is_employed_klips", "is_nonemployed_klips"]] = pd.NA
+
+    debt = _klips_to_na(df["debt_any_code"])
+    df["has_debt_klips"] = debt.map({1: 1, 2: 0}).astype("Int64")
+    df["labor_income_year"] = _klips_to_na(df["labor_income_year"])
+    df["living_cost_month"] = _klips_to_na(df["living_cost_month"])
+    df["sex"] = _klips_to_na(df["sex"])
+    df["survey_year"] = 2023
+
+    if save:
+        save_processed_csv(df, "klips_youth_2023.csv")
+
+    # 검증 출력
+    print(f"[preprocess] KLIPS 26차 청년(19-34): {len(df):,} 명 "
+          f"(개인 전체 {len(p):,})")
+    resp = df["econ_status_code"].notna().sum()
+    print(f"  - 취업상태 응답: {resp:,}명 | 취업(1)={int((df['econ_status_code']==1).sum())}, "
+          f"실업(2)={int((df['econ_status_code']==2).sum())}, "
+          f"비경활(3)={int((df['econ_status_code']==3).sum())}")
+    print(f"  - 부채유무 응답: {df['has_debt_klips'].notna().sum():,}명 | "
+          f"부채보유율={df['has_debt_klips'].mean():.1%}")
+    return df
+
+
 def main() -> int:
     """전처리 파이프라인 진입점.
 
-    청년삶 2024 분석용 통합 데이터셋을 생성한다.
+    청년삶 2024 분석용 통합 데이터셋 + EAPS 배경 집계 + KLIPS 보조검증을 생성한다.
     (다른 데이터 전처리가 추가되면 여기에 함수를 더 호출한다.)
     """
     print("[preprocess] 청년삶 2024 분석용 전처리 시작...")
     result = build_youth_2024_analysis()
     if result is None:
         return 1
+    print("\n[preprocess] EAPS 배경 집계 전처리 시작...")
+    build_eaps_summary()
+    print("\n[preprocess] KLIPS 26차 청년 보조검증 전처리 시작...")
+    build_klips_youth()
     return 0
 
 
