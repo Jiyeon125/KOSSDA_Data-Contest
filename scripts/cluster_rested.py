@@ -36,7 +36,10 @@ def main() -> int:
     prof = cl.profile(labeled)
     names = cl.auto_name(prof)
     prof["유형"] = prof["cluster"].map(names)
-    print(f"[cluster] 쉬었음 {len(df):,}명 · k={k} · 실루엣 {scores}")
+    inertia_dbg = cl.inertia_by_k(df)
+    print(f"[cluster] 쉬었음 {len(df):,}명 · k={k}")
+    print("  실루엣:", {kk: round(v, 3) for kk, v in scores.items()})
+    print("  관성(WCSS):", {kk: round(v, 0) for kk, v in inertia_dbg.items()})
     print(prof.to_string(index=False))
 
     # 군집 간 웰빙 차이 유의성(비가중 검정) — 고립형 소표본이라 효과크기 함께 보고
@@ -52,15 +55,25 @@ def main() -> int:
     print(f"[검정] 고립형(n={len(iso)}) vs 나머지(n={len(rest)}): "
           f"p={pu:.4g}, rank-biserial r={rb:.3f}")
 
-    # --- Fig 13: 실루엣(군집 수 선택 근거) ---
-    fig, ax = plt.subplots(figsize=(6.5, 4))
+    # --- Fig 13: 군집 수 선택 — 엘보우(WCSS) + 실루엣 ---
+    inertia = cl.inertia_by_k(df)
+    fig, (axe, axs) = plt.subplots(1, 2, figsize=(12, 4.2))
+    ki = list(inertia)
+    axe.plot(ki, [inertia[i] for i in ki], marker="o", color="#4C78A8")
+    axe.axvline(K, color="#E45756", ls="--", alpha=0.7)
+    axe.text(K, max(inertia.values()), f" 채택 k={K}", color="#E45756", va="top")
+    axe.set_title("엘보우 — 관성(WCSS)")
+    axe.set_xlabel("군집 수 k"); axe.set_ylabel("관성(WCSS, 낮을수록 응집)")
+    axe.set_xticks(ki); axe.grid(alpha=0.3)
+
     ks = list(scores)
-    ax.plot(ks, [scores[i] for i in ks], marker="o")
-    ax.axvline(K, color="#E45756", ls="--", alpha=0.7)
-    ax.text(K, min(scores.values()), f" 채택 k={K}", color="#E45756", va="bottom")
-    ax.set_title("군집 수 선택 — 실루엣 점수")
-    ax.set_xlabel("군집 수 k"); ax.set_ylabel("실루엣 점수")
-    ax.set_xticks(ks); ax.grid(alpha=0.3)
+    axs.plot(ks, [scores[i] for i in ks], marker="o", color="#54A24B")
+    axs.axvline(K, color="#E45756", ls="--", alpha=0.7)
+    axs.text(K, min(scores.values()), f" 채택 k={K}", color="#E45756", va="bottom")
+    axs.set_title("실루엣 점수 (높을수록 분리)")
+    axs.set_xlabel("군집 수 k"); axs.set_ylabel("실루엣 점수")
+    axs.set_xticks(ks); axs.grid(alpha=0.3)
+    fig.suptitle("군집 수 선택 근거 — 엘보우 + 실루엣", fontsize=13)
     _save(fig, "13_cluster_selection.png")
 
     order = prof["유형"].tolist()

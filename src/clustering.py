@@ -50,6 +50,17 @@ def silhouette_by_k(df: pd.DataFrame, k_range=range(2, 6)) -> dict[int, float]:
     return scores
 
 
+def inertia_by_k(df: pd.DataFrame, k_range=range(1, 7)) -> dict[int, float]:
+    """k 후보별 관성(WCSS) — 엘보우 기법용. 꺾이는 지점이 적정 k."""
+    Xv, _ = _feature_matrix(df)
+    Xs = StandardScaler().fit_transform(Xv)
+    out = {}
+    for k in k_range:
+        km = KMeans(n_clusters=k, n_init=10, random_state=RANDOM_STATE).fit(Xs)
+        out[k] = float(km.inertia_)
+    return out
+
+
 def cluster_rested(df: pd.DataFrame, k: int | None = None) -> tuple[pd.DataFrame, int, dict]:
     """쉬었음 청년을 군집화해 cluster 라벨을 붙인다.
 
