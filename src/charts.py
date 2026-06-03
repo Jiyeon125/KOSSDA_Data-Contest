@@ -140,8 +140,9 @@ def line_dual_axis(
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
     )
     fig.update_xaxes(title_text=x)
-    fig.update_yaxes(title_text=left_title, secondary_y=False)
-    fig.update_yaxes(title_text=right_title, secondary_y=True)
+    # 0 기준선부터 그려 축 왜곡(과장)으로 보이지 않게 한다
+    fig.update_yaxes(title_text=left_title, secondary_y=False, rangemode="tozero")
+    fig.update_yaxes(title_text=right_title, secondary_y=True, rangemode="tozero")
     return fig
 
 
