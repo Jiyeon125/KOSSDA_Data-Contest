@@ -51,6 +51,20 @@ CONTENT_SCAN_MAX_KB = 256
 TEXT_EXTS = (".py", ".md", ".txt", ".toml", ".cfg", ".ini", ".json",
             ".yml", ".yaml", ".mdc", ".gitignore")
 
+# ── 문서 동기화 규칙 (코드 변경 시 함께 갱신을 권장하는 텍스트) ───────────
+# 분석 결과/화면이 바뀌는 코드 (이게 바뀌면 발표 대본·설명 문서도 검토 필요)
+CODE_TRIGGER_EXACT = ("app.py",)
+CODE_TRIGGER_PREFIX = ("src/",)
+# 코드 변경 시 함께 갱신을 검토해야 하는 '서술형' 문서
+# (PROGRESS.md 는 auto_commit 이 매번 자동 갱신하므로 제외)
+NARRATIVE_DOCS = (
+    "발표_대본.md",
+    "docs/visualization_strategy.md",
+    "docs/research_design.md",
+    "docs/project_context.md",
+    "README.md",
+)
+
 
 def _git(args: list[str]) -> str:
     """git 명령 실행 (비ASCII 경로 보존)."""
@@ -175,6 +189,33 @@ def check_data_dir_ignored() -> list[str]:
     return problems
 
 
+def check_docs_sync(files: list[str]) -> list[str]:
+    """코드가 바뀌었는데 관련 서술형 문서/대본이 함께 갱신되지 않았는지 점검.
+
+    하드 실패가 아니라 '경고(주의)'로만 반환한다(사소한 수정까지 막지 않기 위함).
+    분석 화면/결과에 영향을 주는 코드(app.py, src/*)가 후보에 있는데
+    NARRATIVE_DOCS 중 아무것도 바뀌지 않았다면 검토하라고 알린다.
+    """
+    def _is_code(f: str) -> bool:
+        return (f in CODE_TRIGGER_EXACT
+                or any(f.startswith(p) for p in CODE_TRIGGER_PREFIX)) and f.endswith(".py")
+
+    code_changed = [f for f in files if _is_code(f) or f in CODE_TRIGGER_EXACT]
+    if not code_changed:
+        return []
+    docs_changed = [f for f in files if f in NARRATIVE_DOCS]
+    if docs_changed:
+        return []
+    warnings = [
+        "코드가 변경되었는데 관련 설명 문서·대본이 함께 갱신되지 않았습니다.",
+        f"   변경 코드: {', '.join(code_changed[:6])}"
+        + (" 등" if len(code_changed) > 6 else ""),
+        "   아래 문서에 반영이 필요한지 검토하세요(불필요하면 무시 가능):",
+    ]
+    warnings += [f"     - {d}" for d in NARRATIVE_DOCS]
+    return warnings
+
+
 def check_gitignore_sanity() -> list[str]:
     gi = PROJECT_ROOT / ".gitignore"
     if not gi.exists():
@@ -195,6 +236,8 @@ def run_checks(verbose: bool = True) -> tuple[bool, list[str]]:
     problems += check_tracked_forbidden()
     problems += check_data_dir_ignored()
 
+    warnings = check_docs_sync(files)  # 경고(커밋 차단 아님)
+
     if verbose:
         print("=" * 60)
         print("[precommit] 커밋 후보 파일 점검")
@@ -205,6 +248,11 @@ def run_checks(verbose: bool = True) -> tuple[bool, list[str]]:
         else:
             print("  (커밋할 변경 없음)")
         print("-" * 60)
+        if warnings:
+            print("[precommit] [주의] 문서 동기화 점검")
+            for w in warnings:
+                print(f"   {w}")
+            print("-" * 60)
         if problems:
             print(f"[precommit] [FAIL] 위반 {len(problems)}건 - 커밋 금지")
             for p in problems:

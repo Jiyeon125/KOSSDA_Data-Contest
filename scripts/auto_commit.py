@@ -4,6 +4,7 @@
 흐름:
     1) PROGRESS.md '커밋 로그' 표에 (시각/메시지/프롬프트) 한 줄 추가
     2) scripts/precommit_check.run_checks() 로 GitHub 업로드 안전점검
+       (+ 코드 변경 시 발표대본·설명문서가 함께 갱신됐는지 '주의' 경고 — 차단은 아님)
     3) 통과 + 변경 있음 일 때만 git add -A && git commit
     4) 위반/오류 시 커밋하지 않고 종료(비0)
 
