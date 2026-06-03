@@ -197,6 +197,65 @@ def fig_group_vulnerability(df: pd.DataFrame) -> None:
     _save(fig, "04_group_vulnerability.png")
 
 
+def fig_rested_economic(df: pd.DataFrame) -> None:
+    """차별점① — 경제 부담만 좁혀서: 쉬었음은 취업/실업자보다 더 쪼들리지 않는다."""
+    metrics = {"has_debt": "부채 보유", "has_living_cost_debt": "생활비 부채",
+               "has_interest": "이자 부담"}
+    groups = ["취업자", "실업자", "쉬었음"]
+    agg = df.groupby("group")[list(metrics)].mean().reindex(groups) * 100
+    fig, ax = plt.subplots(figsize=(8.5, 4.6))
+    x = range(len(metrics))
+    width = 0.26
+    for i, g in enumerate(groups):
+        bars = ax.bar([xi + i * width for xi in x], agg.loc[g].values, width,
+                      label=g, color=GROUP_COLORS[g])
+        for b, v in zip(bars, agg.loc[g].values):
+            ax.text(b.get_x() + b.get_width() / 2, v, f"{v:.1f}",
+                    ha="center", va="bottom", fontsize=8)
+    ax.set_xticks([xi + width for xi in x])
+    ax.set_xticklabels(list(metrics.values()))
+    ax.set_ylabel("해당 비율 (%)")
+    ax.set_title("차별점① 경제 부담 — 쉬었음은 오히려 가장 낮음")
+    ax.legend(title="노동상태")
+    ax.grid(axis="y", alpha=0.3)
+    ax.margins(y=0.15)
+    _save(fig, "04b_rested_economic.png")
+
+
+def fig_rested_survival(df: pd.DataFrame) -> None:
+    """step4 — 쉬었음 청년은 '무엇으로' 버티는가: 가족 중심 사적 안전망.
+
+    평균 경제부담이 낮은 이유(=다수가 가족 울타리로 버팀)를 보여주고,
+    제도(공공·민간)는 미미함을 드러내 다음 단계(울타리 없는 소수)로 잇는다.
+    """
+    rested = df[df["group"] == "쉬었음"]
+    n = len(rested)
+
+    def pct(col: str) -> float:
+        return float(pd.to_numeric(rested[col], errors="coerce").eq(1).mean() * 100)
+
+    bars = {
+        "부모와 동거": float((1 - pd.to_numeric(rested["not_parent_cohabit"], errors="coerce")).mean() * 100),
+        "가족 도움 가능": pct("help_living_family"),
+        "지인 도움 가능": pct("help_living_acq"),
+        "공공기관": pct("help_living_public"),
+        "민간기관": pct("help_living_private"),
+    }
+    colors = ["#4C78A8", "#4C78A8", "#72B7B2", "#9D9D9D", "#9D9D9D"]
+    fig, ax = plt.subplots(figsize=(8.5, 4.6))
+    b = ax.bar(list(bars), list(bars.values()), color=colors)
+    for rect, v in zip(b, bars.values()):
+        ax.text(rect.get_x() + rect.get_width() / 2, v, f"{v:.1f}%",
+                ha="center", va="bottom", fontsize=9, fontweight="bold")
+    ax.set_ylabel("쉬었음 청년 중 해당 비율 (%)")
+    ax.set_title(f"쉬었음 청년은 무엇으로 버티는가 — 가족 중심 사적 안전망 (n={n:,})")
+    ax.margins(y=0.18)
+    ax.grid(axis="y", alpha=0.3)
+    ax.text(0.99, -0.16, "※ 가족·부모가 압도적, 공공·민간 제도는 미미 → 가족 의존형 생활 유지",
+            transform=ax.transAxes, ha="right", va="top", fontsize=8, color="#666")
+    _save(fig, "04c_rested_survival.png")
+
+
 def fig_group_psych(df: pd.DataFrame) -> None:
     """집단별 주관적 지표 평균(삶 만족도·행복·주관적 계층)."""
     items = [("life_satisfaction", "삶 만족도 (0-10)"),
@@ -374,6 +433,8 @@ def main() -> int:
     print("[insights] 청년삶 집단 비교 그림 생성...")
     fig_group_overview(df)
     fig_group_vulnerability(df)
+    fig_rested_economic(df)
+    fig_rested_survival(df)
     fig_group_psych(df)
     fig_help_network(df)
 
