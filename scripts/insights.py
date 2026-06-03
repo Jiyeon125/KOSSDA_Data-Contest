@@ -92,20 +92,66 @@ def fig_eaps_trends(eaps: pd.DataFrame) -> None:
             transform=ax.transAxes, ha="right", va="top", fontsize=8, color="#666")
     _save(fig, "01_eaps_rested_trend.png")
 
-    # 청년 실업률 vs 전체
+    # 청년 실업률 vs 쉬었음 — 같은 연령(15-29)·기간, 단위가 달라 2단 패널로 대비
     rate = eaps[eaps["indicator"].str.contains("실업률", na=False)]
-    fig, ax = plt.subplots(figsize=(8, 4.5))
-    for age in ("15 - 64세", "15 - 29세"):
-        sub = rate[rate["age_group"] == age].sort_values("year")
-        if sub.empty:
-            continue
-        ax.plot(sub["year"], sub["value"], marker="o", ms=3, label=age)
-    ax.set_title("실업률 추이 (EAPS, %)")
-    ax.set_xlabel("연도")
-    ax.set_ylabel("실업률 (%)")
-    ax.legend()
-    ax.grid(alpha=0.3)
+    u = rate[rate["age_group"] == "15 - 29세"].sort_values("year")
+    r = rested[rested["age_group"] == "15 - 29세"].sort_values("year")
+    fig, (axt, axb) = plt.subplots(2, 1, figsize=(8, 6), sharex=True)
+    axt.plot(u["year"], u["value"], marker="o", ms=3, color="#F58518")
+    axt.set_title("청년(15-29) 실업률 — 등락 후 최근 오히려 하락", color="#F58518")
+    axt.set_ylabel("실업률 (%)")
+    axt.grid(alpha=0.3)
+    axb.plot(r["year"], r["value"], marker="o", ms=3, color="#4C78A8")
+    axb.set_title("청년(15-29) '쉬었음' 인구 — 추세적 증가", color="#4C78A8")
+    axb.set_ylabel("쉬었음 (천 명)")
+    axb.set_xlabel("연도")
+    axb.grid(alpha=0.3)
+    fig.suptitle("같은 청년, 같은 기간 — 실업률은 하락하는데 '쉬었음'은 증가", fontsize=13)
     _save(fig, "02_eaps_unemp_rate.png")
+
+
+def fig_youth_unemp_vs_rested(eaps: pd.DataFrame) -> None:
+    """청년(15-29) 실업률(%) ↓ vs '쉬었음' 인구(천명) ↑ 대비.
+
+    단위가 다른 두 지표라 이중축(혼란) 대신 **상하 2단(축 공유 X)** 으로 그린다.
+    핵심 메시지: 실업률이 좋아져도 '쉬었음'은 늘어 → 실업통계 밖 사각지대.
+    """
+    yr_min = 2003
+    rate = eaps[(eaps["indicator"].str.contains("실업률", na=False))
+                & (eaps["age_group"] == "15 - 29세")
+                & (eaps["year"] >= yr_min)].sort_values("year")
+    rested = eaps[(eaps["indicator"] == "쉬었음")
+                  & (eaps["age_group"] == "15 - 29세")
+                  & (eaps["year"] >= yr_min)].sort_values("year")
+    fig, (a1, a2) = plt.subplots(2, 1, figsize=(8.5, 6), sharex=True)
+    a1.plot(rate["year"], rate["value"], marker="o", ms=3, color="#F58518")
+    a1.set_ylabel("청년 실업률 (%)", color="#F58518")
+    a1.set_title("① 청년(15-29) 실업률 — 2017년 정점 후 하락(표면상 개선)", fontsize=11)
+    a1.grid(alpha=0.3)
+    if not rate.empty:
+        rmax = rate.loc[rate["value"].idxmax()]
+        rend = rate.iloc[-1]
+        a1.annotate(f"{rmax['value']:.1f}%", (rmax["year"], rmax["value"]),
+                    textcoords="offset points", xytext=(0, -14), ha="center",
+                    color="#F58518", fontsize=9, fontweight="bold")
+        a1.annotate(f"{rend['value']:.1f}%", (rend["year"], rend["value"]),
+                    textcoords="offset points", xytext=(0, 8), ha="center",
+                    color="#F58518", fontsize=9, fontweight="bold")
+        a1.margins(y=0.18)
+
+    a2.plot(rested["year"], rested["value"], marker="o", ms=3, color="#4C78A8")
+    a2.set_ylabel("청년 쉬었음 (천명)", color="#4C78A8")
+    a2.set_title("② 그런데 '쉬었음' 인구는 증가 — 노동시장 밖으로 이탈", fontsize=11)
+    a2.set_xlabel("연도")
+    a2.grid(alpha=0.3)
+    if not rested.empty:
+        send = rested.iloc[-1]
+        a2.annotate(f"{send['value']:.0f}천", (send["year"], send["value"]),
+                    textcoords="offset points", xytext=(0, 8), ha="center",
+                    color="#4C78A8", fontsize=9, fontweight="bold")
+    fig.suptitle("실업률 ↓ 인데 쉬었음 ↑ — 실업통계로는 안 잡히는 청년 사각지대", fontsize=13)
+    fig.tight_layout()
+    _save(fig, "02b_youth_unemp_vs_rested.png")
 
 
 # ----------------------------------------------------------------------
@@ -321,6 +367,7 @@ def main() -> int:
     try:
         eaps = q.run_query("SELECT * FROM eaps_labor_status_summary")
         fig_eaps_trends(eaps)
+        fig_youth_unemp_vs_rested(eaps)
     except Exception as exc:  # noqa: BLE001
         print(f"  [건너뜀] EAPS 그림 실패: {exc}")
 
