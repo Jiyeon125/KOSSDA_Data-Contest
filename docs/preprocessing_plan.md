@@ -3,6 +3,8 @@
 > 데이터별 필터·컬럼·코드값·결측·파생변수 규칙을 정의한다.
 > 실제 컬럼명/코드값을 확인 못한 부분은 **"확인 필요"** 로 표기하고 임의 확정하지 않는다.
 > 통계 검증·분석방법은 `docs/research_design.md` 를, 변수 의미는 `docs/variable_candidates.md` 를 참조.
+>
+> 🔴 **최신 기준 안내**: 분석 서사의 단일 출처는 [`docs/analysis_flow.md`](analysis_flow.md). 군집화 관련 전처리 서술은 **참고용**(군집 폐기 D1). 청년삶2024 파생에는 공식 은둔변수 `seclusion_duration`(2024 전용) 포함. **KGSS(.sav/.dta) 전처리 `build_kgss` 추가 예정**(pyreadstat, `scripts/kgss_inspect.py`로 변수 확정 후).
 
 ## 0. 공통 원칙
 

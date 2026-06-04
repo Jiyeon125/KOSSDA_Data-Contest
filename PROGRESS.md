@@ -23,24 +23,32 @@
 - [x] 청년삶 2022 분석 전처리 `build_youth_2022_analysis()` (2024와 동일 파생규칙, econ 1/2/3 코딩 대응) → `youth_life_2022_analysis` 적재
 
 ## 2. 분석 / 통계검증
-- [x] 집단비교 검정 헬퍼(Mann-Whitney/카이제곱 + 효과크기) `queries.py`
+> 🔴 **실제 분석 서사·결정의 단일 출처 = [`docs/analysis_flow.md`](docs/analysis_flow.md)** (1~10단계 + 결정로그 D1~D16, **LOCKED**).
+> 🟢 **PPT 초안 = [`발표_초안.md`](발표_초안.md)** (표지 제외 10장).
+
+- [x] 집단비교 검정 헬퍼(Mann-Whitney/카이제곱/Fisher + 효과크기) `queries.py`
 - [x] 가중 추정 헬퍼(가중 비율/평균 + 모집단 규모) `queries.py`
-- [x] 쉬었음 내부 비교(부모동거/도움유무) 유의성·효과크기 보고 (`scripts/insights.py`)
-- [x] 생활안전망 유형화(비공식/공식/없음) + 취약 누적 스펙트럼 (`scripts/rested_gap.py`)
-- [x] 취약 하위유형 군집화(K-means, 임의 typology 대체) (`src/clustering.py`, `scripts/cluster_rested.py`)
-  - k=3(엘보우+실루엣): 안정형 83% / 사회적 고립형 4% / 부채압박형 13%, 군집 간 웰빙차 KW p<0.0001
-- [x] 2022 vs 2024 재현성 비교 (`scripts/compare_years.py`, 그림 16~18)
-  - 쉬었음 비중 5.2%→7.2%(가중), 내부 취약지표(지원망없음·부채·이자·고립) 모두 2024↑·유의
-  - 3개 하위유형(안정/지원망없음·고립/부채압박) 2022에서도 재현, 취약유형 웰빙 최저 재현
+- [x] **단계별 확정 분석(iterative)** — `docs/analysis_flow.md`에 1~9단계 기록
+  - 1 배경(EAPS 추이) · 2 실업률↓ vs 쉬었음↑ 사각지대 · 4 가족 중심 사적 안전망(fig04c)
+  - 5 **'고립' 정조준**(fig21: 삶만족 r=-0.47, 도움없음 OR=5.77, Fisher) ← 핵심 축
+  - 6 취약 '총량 스펙트럼' 폐기(fig22, rho=-0.09 비단조) · 8 2022→2024 재현성(fig16/17/17b)
+- [~] ~~취약 하위유형 K-means 군집화~~ **폐기(D1)** — 자연 군집 없음·고립형만 웰빙 유의.
+  코드(`src/clustering.py`)·그림(13~19)은 **방법론 이력**으로만 보존.
+- [x] **공식 은둔변수 용량반응**(`scripts/rested_seclusion.py`, fig23) — 은둔 기간↑→삶만족↓(6.70→3.75), 외부 복지부 조사(3.7 vs 6.7) 수렴
+- [x] 2022 vs 2024 재현성 (`scripts/compare_years.py`, 그림 16/17/17b)
+  - 쉬었음 비중 5.2%→7.2%(가중), 내부 취약(지원망없음·부채·이자) 모두 2024↑·유의, 평균 웰빙 불변=내부격차 심화
+  - 사적 안전망 약화(가족도움 95→85%, 도움없음 3.5→8.4%) / 고립은 척도차로 연도비교 제외(D9)
+- [x] **외부 보강**(`docs/external_data_references.md`): OECD/고용정보원 NEET 배경(fig00), 복지부 2023 고립·은둔 실태조사(fig23 수렴)
+- [x] **10단계 KGSS 전국 일반화(KOSSDA 기둥)** `scripts/kgss_isolation.py`, fig24 — 고립 격차 Δ0.317*** vs 취업 Δ0.023 n.s.(약 14배), 페널티 취업·미취업 일관. 부록 fig25(친구수 용량반응)·fig26(외로움→우울 2012). N=3,489(2021·23·25 통합)
 
 ## 3. 시각화 / 산출물
-- [x] 인사이트용 경량 시각화 9종 + 내부격차 3종 `outputs/figures/`
-- [x] `docs/visualization_strategy.md` 시각화 전략 확정
-- [x] Streamlit 1차 대시보드 S0~S7 (`app.py`, 배경→정체성→생계→내부격차→스펙트럼→보조검증→결론)
-- [x] 각 화면 '집계·분석 방법/읽는 법' 설명 보강 + 이중축 0기준 고정
-- [x] `발표_대본.md` 공모전 발표 대본(Q&A 포함)
-- [x] 분석보강(2022 비교, 군집화) 대시보드 반영 — S4 데이터기반 군집 하위유형 전면화(휴리스틱 typology는 참고로 강등), S7 재현성·추세(2022↔2024) 섹션 신설
-- [ ] 공모전 PPT 10장 구성
+- [x] 인사이트용 경량 시각화 다수 `outputs/figures/` (fig00 NEET, 04c 생존, 21 고립, 23 은둔, 24~26 KGSS, 16/17/17b 재현성)
+- [x] `docs/visualization_strategy.md` 시각화 전략(상단 최신기준 배너 부착)
+- [x] **공모전 PPT 10장 초안 `발표_초안.md`** — 데이터·방법·인사이트·출처(링크/DOI)+그림 매핑 완료(1차 summary)
+- [x] Streamlit 대시보드 `app.py` — **확정 서사(고립 핵심·KGSS 기둥)로 재정렬** (S4 고립·S5 은둔·S6 KGSS, 군집/스펙트럼 폐기)
+- [x] 각 화면 '집계·분석 방법/읽는 법' 설명 보강 + 축 0기준 고정
+- [~] `발표_대본.md` — **STALE**: 옛 군집 S4 기준. 외부보강·은둔·KGSS 반영해 **재작성 필요**(`발표_초안.md` 기준으로)
+- [ ] PPT 실제 디자인(요약문 양식) + Streamlit Community Cloud 배포
 
 ## 4. 운영 / 자동화
 - [x] `.gitignore` 데이터·비밀정보 차단
@@ -48,7 +56,20 @@
 - [x] `scripts/auto_commit.py` 안전점검 통과 시에만 커밋 + 로그 갱신
 - [x] `PROGRESS.md` 체크리스트
 
-## 5. 향후 분석 아이디어 (백로그)
+## 5. 진행 중 / 향후 (백로그)
+
+### 5-0. KOSSDA 데이터 강화 — **KGSS 본편 기둥 확정** (10단계)
+- [x] **KGSS 도입(KOSSDA 기둥·KGSS상 트랙)** — 한국종합사회조사 2003–2025 누적(DOI `KOSSDA-A1-CUM-0074-V1`).
+  - [x] pyreadstat 도입 + `.sav/.dta` 변수탐색기 `scripts/kgss_inspect.py`
+  - [x] (사용자) 한국어 `.sav`+코드북 `data/raw/kgss/` 투입 확인
+  - [x] 변수 확정(`HAPPINSS`·`BESTFRND`·`EMPLY`·`OTHREL4`·`FEELDOWN`) → `scripts/kgss_isolation.py`
+  - [x] **고립>취업 전국 재현** 분석·시각화(fig24, 부록 25·26) — 청년삶 미시결과의 외적 타당도 + KGSS상 자격
+  - [ ] (선택) `build_kgss` 전처리 → `kgss_*` 테이블로 DB 적재(현재는 스크립트가 `.sav` 직접 로드)
+- [~] (백로그) **KLIPS 격상** — 현재 정직축소(fig09 가구부채)로 자격 충족. 추가로 가구 경제토대 분석은 시험 후 재검토.
+
+> ⏭ **시험 후 다음 라운드**: 레포 새로 파서 KOSSDA 자료검색 추가 탐색(청년삶·EAPS 소장 확인, 다른 KOSSDA 소장 대체데이터), KGSS DB 적재, PPT 디자인·배포.
+
+### 5-1. 기타 아이디어
 - [ ] **지원하는 '가족'의 부담** — 쉬었음 청년을 떠받치는 가족이 (1) 지원에 얼마나 부담을 느끼는지,
   (2) 수입(가구소득)의 얼마를 지원에 지출하는지.
   ※ 데이터 한계 점검 필요: 청년삶은 *청년 응답자* 기준이라 '부양 가족의 주관적 부담' 직접 변수는 없을 가능성 큼.
@@ -64,6 +85,7 @@
 
 | 시각(KST) | 메시지 | 프롬프트 요약 |
 | --- | --- | --- |
+| 2026-06-05 00:33 | feat(1차 summary): 고립 핵심·KGSS 기둥으로 서사 LOCKED — 문서 최신화 + PPT 초안 + 대시보드 재정렬 + KGSS 하드코딩 제거 | 1차 summary: (1)모든 md 최신화(analysis_flow D14~D16 KGSS기둥·캥거루차별화, external_refs KGSS인용, research_design §9 확정, PROGRESS) (2)발표_초안.md PPT 10장 신설 (3)app.py를 군집폐기→고립핵심·KGSS기둥(S4~S6)으로 재정렬, st.image+plotly 혼합 (4)KGSS 수치 하드코딩 제거: kgss_isolation.py가 요약CSV 산출→앱이 읽어 표시. AppTest 9섹션 0예외 |
 | 2026-06-04 22:26 | feat(KGSS 준비): pyreadstat 도입 + KGSS .sav/.dta 변수탐색기(kgss_inspect.py) + raw/kgss 폴더 | KGSS는 SPSS/Stata 포맷이라 pyreadstat로 코드없이 읽기. 변수설명·값레이블 자동추출해 고립·웰빙·고용·계층 변수 탐색하는 스캐폴드. 파일 받기 전 준비단계 |
 | 2026-06-04 22:10 | feat(외부보강+KLIPS): NEET 배경(fig00)·공식 은둔 용량반응+복지부 수렴(fig23)·KLIPS 정직축소(fig09) + 외부데이터 출처문서 | KLIPS는 KOSSDA 필수데이터라 제외 대신 정직축소(가구부채만, 이상소득 제거). 5단계 seclusion_duration 용량반응+복지부 고립은둔 외부수렴(6.70~6.7,3.75~3.7). 1단계 OECD NEET 배경. external_data_references.md 신설, analysis_flow D11~D13 |
 | 2026-06-04 21:38 | docs: 물가(CPI) 보류 결정 기록(D10) + 대안 방법B(has_living_cost_debt) 백로그 | 물가 인과 도입은 구조적 정책공백 주장 희석 우려로 보류, 안전망약화는 객관지표로만, 생활비압박은 내부변수 대안 명시. analysis_flow D10 + PROGRESS 백로그 |

@@ -2,6 +2,9 @@
 
 > 각 질문에 사용할 데이터·변수·분석방법·시각화를 매핑한다.
 > "현재 데이터만으로 가능한지"와 "추가 확인 필요"를 명시한다. 통계 검증 방법은 `docs/research_design.md` §5 원칙을 따른다.
+>
+> 🔴 **최신 기준 안내**: 실제 분석 서사·결정의 단일 출처는 [`docs/analysis_flow.md`](analysis_flow.md)(1~9단계 + D1~D13).
+> 'K-means 군집(Question C)'은 **폐기**(D1·D7) → 내부 위험은 **'고립' 단일 축**. KOSSDA 보조는 KLIPS 유지 + **KGSS 도입 예정**(고립↔웰빙 전국 재현). 외부보강·은둔변수는 `analysis_flow.md`·`external_data_references.md` 참조.
 
 ---
 

@@ -9,10 +9,11 @@
 ## 0. 공모전 데이터 조건 (확인)
 
 - 2차 데이터 활용 + **1건 이상 KOSSDA 소장 데이터** 필수.
-- 우리 보유 데이터 중 **KOSSDA 소장 확인** = **KLIPS(한국노동패널/Korean Labor and Income Panel Study)**.
-  → 자격조건은 KLIPS로 충족(그래서 KLIPS를 제외하지 않고 '정직 축소'로 유지, D11).
-- **청년삶실태조사·경제활동인구조사(EAPS)** 는 KOSIS/MDIS 경로로 확인됨. KOSSDA 소장 여부는
-  **미확인** → KOSSDA 사이트(kossda.snu.ac.kr) 자료검색에서 직접 확인 권장(있으면 DOI 추가 인용).
+- **[특별상 트랙] SRC가 KOSSDA에 기탁한 데이터 1건+ 필수 → KGSS** 활용 시 **「한국종합사회조사(KGSS)상」** 응모 자격.
+- 우리 보유 KOSSDA 소장 데이터 = **① KGSS(한국종합사회조사, SRC 기탁) ② KLIPS(한국노동패널)**.
+  → 필수조건·특별상 트랙 모두 충족. **KGSS는 본편 기둥(10단계·fig24), KLIPS는 보조검증(9단계·fig09)**.
+- **청년삶실태조사·경제활동인구조사(EAPS)** 는 KOSIS/MDIS 경로(메인 미시분석·배경). KOSSDA 소장 여부는
+  추가 확인 권장(있으면 DOI 추가 인용).
 
 ---
 
@@ -42,7 +43,15 @@
 - 주의: 이 공식 비율은 외출·관계·은둔 문항 **복합 정의**라 우리가 쓴 `seclusion_duration`(은둔 지속기간)·
   `outing_freq`(외출빈도) 단일 변수와 **정의가 달라** 수치 직접대조는 하지 않음(방향 참고만).
 
-## 4. KOSSDA 소장 — KLIPS (자격 충족 데이터)
+## 4. KOSSDA 소장 — KGSS (본편 기둥 · KGSS상 트랙) ⭐
+
+- 한국종합사회조사(KGSS) 2003–2025 누적자료, 성균관대학교 서베이리서치센터(SRC) 수행 / **KOSSDA 소장(SRC 기탁)**.
+- **자료인용서식(공모전 예시 그대로)**:
+  > 김지범. 한국종합사회조사, 2003-2025 [누적자료] [데이터 세트]. 성균관대학교 서베이리서치센터 [연구수행기관]. 한국사회과학자료원(KOSSDA) [자료제공기관], 2026-03-27, https://doi.org/10.22687/KOSSDA-A1-CUM-0074-V1.
+- 본 프로젝트 활용 범위: 2021·23·25 통합(N=3,489), 가중 FINALWT. **취업 여부보다 고립(믿는 친구 0명)이 행복을 더 가른다**는
+  전국 일반화(fig24). 부록: 친구수 용량반응(fig25)·외로움→우울 수렴(fig26, 2012).
+
+## 5. KOSSDA 소장 — KLIPS (보조검증 데이터)
 
 - 한국노동패널조사(KLIPS) 26차(2023년 조사), 한국노동연구원. KOSSDA 소장(시리즈: Korean Labor and Income Panel Study).
 - **인용 시**: KOSSDA 홈페이지 해당 자료 메타데이터의 '자료인용서식'을 그대로 사용(DOI 포함).
@@ -55,4 +64,5 @@
 | --- | --- | --- |
 | 고용정보원 NEET(§2) | `00_neet_oecd_background.png` | 1단계 배경(국제·구조 맥락) |
 | 복지부 고립은둔(§1) | `23_rested_seclusion_doseresponse.png` 우패널 | 5단계 외부 수렴 교차검증 |
-| KLIPS(§4) | `09_klips_supplement.png` | KOSSDA 보조검증 |
+| **KGSS(§4)** | `24_kgss_isolation_vs_employment.png` (+25·26 부록) | **10단계 전국 일반화(KOSSDA 기둥·KGSS상)** |
+| KLIPS(§5) | `09_klips_supplement.png` | 9단계 KOSSDA 보조검증 |

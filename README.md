@@ -2,8 +2,9 @@
 
 2026 경영정보처리론 · KOSSDA 대학생 데이터 시각화 공모전 참여 프로젝트
 
-> ⚠️ 현재 저장소는 **실행 가능한 최소 구조(skeleton)** 단계입니다.
-> 화면에 보이는 모든 수치는 **SAMPLE(예시) 데이터**이며 실제 분석 결과가 아닙니다.
+> 📊 현재 **실데이터 분석 진행 단계**입니다(청년삶 2022·2024, EAPS, KLIPS 적재·분석 완료).
+> 분석 서사·결정의 단일 출처는 [`docs/analysis_flow.md`](docs/analysis_flow.md)(1~9단계 + 결정로그),
+> 진행상황은 [`PROGRESS.md`](PROGRESS.md). 원본 데이터는 GitHub에 올리지 않습니다.
 
 ---
 
@@ -23,10 +24,13 @@ KOSSDA(한국사회과학자료원) 데이터를 활용하여 노동시장에서
 
 ## 분석 목표
 
-1. 청년 '쉬었음' 집단의 **하위 유형 구분**
-2. 하위 유형별 **취약성(건강·경제·사회적 고립 등)** 수준 비교
-3. **장기 쉬었음** 상태로 이어지는 특성 탐색
-4. 정책적 **우선 개입 대상** 집단 식별
+1. '쉬었음' 청년이 **무엇으로 버티는가** — 사적 안전망(가족 중심) 구조 확인
+2. 그 안에서 **취약을 가르는 핵심 축 = '사회적 고립'** 정조준(웰빙↓·도움없음↑, 공식 은둔변수 용량반응)
+3. 2022→2024 **재현성·악화 추세** 확인(규모↑, 사적 안전망 약화, 평균 불변=내부격차 심화)
+4. 정책적 **우선 개입 대상**(고립·도움없음) 식별
+
+> 초기엔 '하위 유형 군집화'를 시도했으나 자연 군집이 없어 **폐기**하고(결정로그 D1·D7),
+> 내부 위험을 **'고립' 단일 축**으로 재정의했습니다. 자세한 경위는 `docs/analysis_flow.md` 참조.
 
 ## 폴더 구조
 
@@ -58,10 +62,13 @@ KOSSDA_Data-Contest/
 │  └─ 01_data_check.ipynb # 데이터 점검용 노트북
 │
 ├─ docs/
-│  ├─ project_context.md  # 프로젝트 배경지식 (작업 전 필독)
-│  ├─ proposal.md         # 기획서
-│  ├─ analysis_plan.md    # 분석 계획
-│  └─ prompt_log.md       # 프롬프트/작업 로그
+│  ├─ project_context.md            # 프로젝트 배경지식 (작업 전 필독)
+│  ├─ analysis_flow.md              # ⭐ 분석 서사·결정로그 (단일 출처, 최신 기준)
+│  ├─ research_design.md            # 연구 설계(제안서 통합) + KOSSDA/KGSS 전략
+│  ├─ external_data_references.md   # 외부 데이터 출처·인용서식
+│  ├─ variable_candidates.md / analysis_question_variable_map.md  # 변수·질문 매핑
+│  ├─ table_design.md / preprocessing_plan.md / visualization_strategy.md
+│  └─ proposal.md / analysis_plan.md / prompt_log.md  # 초기 기획·로그(이력)
 │
 └─ assets/
    └─ images/             # 이미지 자료
@@ -117,7 +124,15 @@ streamlit run app.py
 
 ## 데이터 출처
 
-> **추후 작성 예정**입니다. (KOSSDA 제공 데이터 명칭 및 출처는 데이터 확정 후 기재)
+| 데이터 | 출처/소장 | 역할 |
+| --- | --- | --- |
+| 청년삶실태조사 2022·2024 | 국무조정실/한국보건사회연구원 (MDIS) | **메인 미시분석** |
+| 경제활동인구조사·청년부가(EAPS) | 통계청 (KOSIS/MDIS) | 배경(쉬었음 추이) |
+| 한국노동패널조사(KLIPS) 26차 | 한국노동연구원 / **KOSSDA 소장** | KOSSDA 보조(가구부채) |
+| 한국종합사회조사(KGSS) 2003–2025 | 성균관대 SRC / **KOSSDA 소장** | KOSSDA 메인 축(고립↔웰빙 재현, **도입 예정**) |
+| (외부 검증) 복지부 2023 고립·은둔 청년 실태조사, OECD/고용정보원 NEET | — | 결과 외적 타당도 |
+
+> 상세 출처·인용서식은 [`docs/external_data_references.md`](docs/external_data_references.md) 참조.
 
 ---
 

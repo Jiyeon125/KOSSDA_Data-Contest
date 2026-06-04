@@ -3,6 +3,9 @@
 > 목적: Streamlit 대시보드 + 공모전 PPT 의 그래프 구성을 **확정**한다.
 > 원칙: 제안서 6단계 흐름을 그대로 따라가며, **쉬었음 청년 '내부'의 생활안전망 격차**를 클라이맥스로 둔다.
 > 모든 수치는 `src/queries.py` 를 통해 DB(`youth_life_2024_analysis`, `eaps_labor_status_summary`, `klips_youth_2023`)에서 가져온다. 하드코딩 금지.
+>
+> 🔴 **최신 기준 안내**: 실제 분석 서사의 **단일 출처는 [`docs/analysis_flow.md`](analysis_flow.md)** (1~9단계 + D1~D13).
+> 본 문서의 **S4 K-means 군집(안정형/고립형/부채압박형)·S7 군집 재현은 폐기**(D1·D7) → 내부 위험은 **'고립' 단일 축**(step5: fig21, 공식 은둔 fig23). 외부보강(fig00 NEET·fig23 복지부 수렴), KGSS 도입 예정 반영 필요.
 
 ---
 

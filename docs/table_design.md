@@ -3,6 +3,8 @@
 > `data/db/youth_analysis.sqlite3` 에 적재된 분석용 테이블 현황.
 > 코드북은 적재하지 않는다. 원본 전체 컬럼이 아니라 **분석 변수만 선별**해 넣는다.
 > **현재 4개 테이블 모두 구현·적재 완료.** 쉬었음은 별도 테이블이 아니라 `is_rested==1` 필터로 사용한다.
+>
+> 🔴 **최신 기준 안내**: 분석 서사의 단일 출처는 [`docs/analysis_flow.md`](analysis_flow.md). 아래 '군집 하위유형(런타임)' 서술은 **폐기**(D1) — 군집/스펙트럼 모두 폐기, 내부 위험은 **'고립' 단일 축**으로 봄. `youth_life_2024_analysis`에는 공식 은둔변수 `seclusion_duration`도 포함(2024 전용). **KGSS 테이블 추가 예정**(`kgss_*`).
 
 ## 1. `youth_life_2024_analysis` (메인) ✅
 
