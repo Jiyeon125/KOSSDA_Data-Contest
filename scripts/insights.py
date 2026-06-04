@@ -297,35 +297,37 @@ def fig_help_network(df: pd.DataFrame) -> None:
 
 
 def fig_klips_supplement(klips: pd.DataFrame) -> dict:
-    """KLIPS 26차(2023) 청년 보조검증: 취업 vs 미취업 비교(소표본 주의)."""
+    """KLIPS 26차(2023) 청년 보조검증(KOSSDA 소장자료) — 정직 축소판.
+
+    한계가 큰 데이터라 '가구 부채 보유율(취업 vs 비취업)' 한 지표만 보조검증으로 남긴다.
+    - 근로소득 패널은 회고형 선택편의로 '비취업>취업'의 비상식 결과 → 본 그림에서 제외.
+    - 비취업 = 실업+비경활(econ_status 2·3)이며 표본이 작고(비경활 식별 한계) 해석 주의.
+    - 역할: 독립 데이터(KOSSDA KLIPS)에서도 비취업 청년이 가구부채를 더 안는 '방향'만 확인.
+    KOSSDA 인용서식(자료별 메타데이터)에 따라 발표/문서에 출처를 명시할 것.
+    """
     df = klips.copy()
     df["g"] = pd.NA
     df.loc[df["is_employed_klips"] == 1, "g"] = "취업"
-    df.loc[df["is_nonemployed_klips"] == 1, "g"] = "미취업"
+    df.loc[df["is_nonemployed_klips"] == 1, "g"] = "비취업"
     df = df[df["g"].notna()]
-    order = ["취업", "미취업"]
+    order = ["취업", "비취업"]
     n_emp = int((df["g"] == "취업").sum())
-    n_non = int((df["g"] == "미취업").sum())
+    n_non = int((df["g"] == "비취업").sum())
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4.3))
-    # 가구 부채 보유율
+    fig, ax1 = plt.subplots(figsize=(7, 4.6))
     debt = df.groupby("g")["has_debt_klips"].mean().reindex(order) * 100
-    ax1.bar(order, debt.values, color=["#4C78A8", "#E45756"])
+    bars = ax1.bar(order, debt.values, color=["#4C78A8", "#E45756"], width=0.55)
     for i, v in enumerate(debt.values):
-        ax1.text(i, v, f"{v:.1f}%", ha="center", va="bottom")
-    ax1.set_title("가구 부채 보유율 (%)")
-    ax1.set_ylabel("%")
-    ax1.margins(y=0.15)
-    # 작년 연간 근로소득 중앙값(만원)
-    inc = df.groupby("g")["labor_income_year"].median().reindex(order)
-    ax2.bar(order, inc.values, color=["#4C78A8", "#E45756"])
-    for i, v in enumerate(inc.values):
-        ax2.text(i, v, f"{v:,.0f}", ha="center", va="bottom")
-    ax2.set_title("작년(2022) 연간 근로소득 중앙값 (만원)\n※회고형: 미취업자도 작년 근로분 포함")
-    ax2.set_ylabel("만원")
-    ax2.margins(y=0.15)
-    fig.suptitle(f"[보조검증] KLIPS 2023 청년 취업 vs 미취업 "
-                 f"(취업 n={n_emp}, 미취업 n={n_non})", y=1.03)
+        ax1.text(i, v, f"{v:.1f}%", ha="center", va="bottom", fontweight="bold")
+    ax1.set_ylabel("가구 부채 보유율 (%)")
+    ax1.margins(y=0.18)
+    ax1.grid(axis="y", alpha=0.3)
+    ax1.set_title(f"[보조검증·KOSSDA] KLIPS 2023 청년(19–34) 가구부채\n"
+                  f"비취업이 더 떠안음 (취업 n={n_emp} vs 비취업 n={n_non})")
+    ax1.text(0.99, -0.16,
+             "※ 출처: 한국노동패널조사(KLIPS) 26차, 한국노동연구원 / KOSSDA 소장. "
+             "비취업=실업+비경활, 소표본·비경활 식별 한계로 '방향'만 참고.",
+             transform=ax1.transAxes, ha="right", va="top", fontsize=8, color="#666")
     _save(fig, "09_klips_supplement.png")
     return {"n_emp": n_emp, "n_non": n_non, "df": df}
 
@@ -455,16 +457,13 @@ def main() -> int:
         klips = q.run_query("SELECT * FROM klips_youth_2023")
         info = fig_klips_supplement(klips)
         kd = info["df"]
-        print(f"  KLIPS 청년 취업(n={info['n_emp']}) vs 미취업(n={info['n_non']}) — 소표본 해석 주의")
-        r = q.chi_square_compare(kd, "g", "has_debt_klips", "미취업", "취업")
+        print(f"  KLIPS 청년 취업(n={info['n_emp']}) vs 비취업(n={info['n_non']}) — 소표본 해석 주의")
+        r = q.chi_square_compare(kd, "g", "has_debt_klips", "비취업", "취업")
         if r.get("p") is not None:
             warn = f" *{r.get('경고')}" if r.get("경고") else ""
-            print(f"  - 가구부채보유율: 미취업 {r['비율A(%)']}% vs 취업 {r['비율B(%)']}% | "
+            print(f"  - 가구부채보유율: 비취업 {r['비율A(%)']}% vs 취업 {r['비율B(%)']}% | "
                   f"p={r['p']:.3g} {r['유의']} | V={r['효과크기V']}{warn}")
-        r2 = q.mann_whitney_compare(kd, "g", "labor_income_year", "미취업", "취업")
-        if r2["p"] is not None:
-            print(f"  - 연간근로소득: 중앙값 미취업 {r2['중앙값_A']} vs 취업 {r2['중앙값_B']} 만원 | "
-                  f"p={r2['p']:.3g} {r2['유의']} | r={r2['효과크기r']}({r2['효과해석']})")
+        print("  - (제외) 연간근로소득은 회고형 선택편의로 '비취업>취업' 비상식 → 그림/주장에서 제외")
     except Exception as exc:  # noqa: BLE001
         print(f"  [건너뜀] KLIPS 그림 실패: {exc}")
 

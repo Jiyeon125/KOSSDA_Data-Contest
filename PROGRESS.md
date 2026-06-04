@@ -64,6 +64,7 @@
 
 | 시각(KST) | 메시지 | 프롬프트 요약 |
 | --- | --- | --- |
+| 2026-06-04 22:10 | feat(외부보강+KLIPS): NEET 배경(fig00)·공식 은둔 용량반응+복지부 수렴(fig23)·KLIPS 정직축소(fig09) + 외부데이터 출처문서 | KLIPS는 KOSSDA 필수데이터라 제외 대신 정직축소(가구부채만, 이상소득 제거). 5단계 seclusion_duration 용량반응+복지부 고립은둔 외부수렴(6.70~6.7,3.75~3.7). 1단계 OECD NEET 배경. external_data_references.md 신설, analysis_flow D11~D13 |
 | 2026-06-04 21:38 | docs: 물가(CPI) 보류 결정 기록(D10) + 대안 방법B(has_living_cost_debt) 백로그 | 물가 인과 도입은 구조적 정책공백 주장 희석 우려로 보류, 안전망약화는 객관지표로만, 생활비압박은 내부변수 대안 명시. analysis_flow D10 + PROGRESS 백로그 |
 | 2026-06-04 21:35 | analysis(8단계 보강): 사적 안전망 약화 그림(17b) - 가족/지인 도움↓·도움없음↑, 제도 공백 지속 | step8 보조: compare_years에 사적 안전망(부모동거/가족·지인도움/공공/도움없음) 2022vs2024 비교표+Fig17b 추가, analysis_flow 8단계에 반영 |
 | 2026-06-04 20:49 | analysis(8단계): 2022 재현성 - 규모/취약 악화 일관, 평균불변=내부격차심화. 고립은 척도차로 연도비교 제외(D9) | step8 compare_years에서 isolation 연도비교 제거(2022 1-7점 vs 2024 1-8점, n=3), 폐기군집 Fig18 제거, Fig17 footnote, analysis_flow 8단계+D9 |
