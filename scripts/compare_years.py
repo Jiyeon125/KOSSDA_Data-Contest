@@ -20,18 +20,18 @@ _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from src import clustering as cl  # noqa: E402
 from src import queries as q  # noqa: E402
 from scripts.insights import _setup_font, _save  # noqa: E402
 
 YEAR_COLORS = {2022: "#9D7660", 2024: "#4C78A8"}
-# 쉬었음 내부 취약지표(군집 입력과 동일) + 표시 라벨
+# 쉬었음 내부 취약지표(연도 간 코딩이 동일해 비교 가능한 것만) + 표시 라벨
+# 주의: isolation_flag(외출빈도 7~8)는 2022 문항이 1~7점, 2024가 1~8점으로
+#       응답척도가 달라 연도 직접비교가 부적절(2022 고립셀 n=3) → 연도비교에서 제외.
 FLAGS = {
     "no_help_flag": "지원망 없음",
     "not_parent_cohabit": "부모 비동거",
     "has_debt": "부채 보유",
     "has_interest": "이자 부담",
-    "isolation_flag": "고립 경향",
 }
 CONT = {"life_satisfaction": "삶 만족도", "happiness": "행복감",
         "subjective_class": "주관 계층"}
@@ -78,6 +78,8 @@ def main() -> int:
                      "경고": test.get("경고", "")})
     flag_df = pd.DataFrame(rows)
     print(flag_df.to_string(index=False))
+    print("  ※ 고립(외출빈도)은 2022 1~7점·2024 1~8점으로 척도가 달라 연도비교 제외"
+          " (2022 고립셀 n=3). 고립 효과는 2024 단년 횡단으로만 입증(step5).")
 
     # === 3) 웰빙(연속형) 가중 평균 + Mann-Whitney ===
     print("\n" + "=" * 64)
@@ -92,20 +94,15 @@ def main() -> int:
     cont_df = pd.DataFrame(rows_c)
     print(cont_df.to_string(index=False))
 
-    # === 4) 군집 하위유형 재현성 (2022 rested 에 동일 군집화) ===
-    print("\n" + "=" * 64)
-    print("[4] 취약 하위유형 재현성 — 2022 군집화(k=3)")
-    lab22, _, _ = cl.cluster_rested(r22, k=3)
-    prof22 = cl.profile(lab22)
-    prof22["유형"] = prof22["cluster"].map(cl.auto_name(prof22))
-    print(prof22.to_string(index=False))
+    # (구) [4] 군집 하위유형 재현성 — 군집 서사 폐기(D1)로 제거.
+    #     내부 위험은 '양/유형 군집'이 아니라 '고립' 단일 축으로 본다(step5).
 
-    _figures(size_df, flag_df, r22, r24, prof22)
-    print("\n[compare] 완료. 그림: outputs/figures/16~18")
+    _figures(size_df, flag_df)
+    print("\n[compare] 완료. 그림: outputs/figures/16~17")
     return 0
 
 
-def _figures(size_df, flag_df, r22, r24, prof22) -> None:
+def _figures(size_df, flag_df) -> None:
     # --- Fig 16: 쉬었음 비중 2022 vs 2024 (가중) ---
     fig, ax = plt.subplots(figsize=(6, 4.4))
     yrs = size_df["연도"].astype(str).tolist()
@@ -130,24 +127,14 @@ def _figures(size_df, flag_df, r22, r24, prof22) -> None:
                 ha="center", fontsize=14, color="#E45756")
     ax.set_xticks(x); ax.set_xticklabels(labels)
     ax.set_ylabel("쉬었음 내 보유율(가중 %)")
-    ax.set_title("쉬었음 내부 취약지표 — 2022 vs 2024  (*p<.05)")
-    ax.legend(); ax.grid(axis="y", alpha=0.3)
+    ax.set_title("쉬었음 내부 취약지표 — 2022 vs 2024  (*p<.05)\n"
+                 "지원망 없음·부채·이자 모두 '악화 방향'으로 일관 (우연 아님)")
+    ax.legend(); ax.grid(axis="y", alpha=0.3); ax.margins(y=0.15)
+    ax.text(0.99, -0.16,
+            "※ 평균 웰빙(삶만족 6.4)은 두 해 거의 동일 → 평균은 그대로인데 "
+            "취약 소수 비중↑ = 내부 격차 심화. 고립은 척도변경으로 제외.",
+            transform=ax.transAxes, ha="right", va="top", fontsize=8, color="#666")
     _save(fig, "17_rested_vuln_2022_2024.png")
-
-    # --- Fig 18: 2022 군집 프로파일(재현성) ---
-    feat_labels = list(cl.FEATURES.values())
-    fig, ax = plt.subplots(figsize=(11, 5))
-    xx = np.arange(len(feat_labels)); w = 0.8 / len(prof22)
-    palette = {"안정형": "#4C78A8", "사회적 고립형": "#E45756", "부채압박형": "#F58518"}
-    for i, (_, r) in enumerate(prof22.iterrows()):
-        ax.bar(xx + i * w, [r[fl] for fl in feat_labels], w,
-               label=f"{r['유형']} (n={r['표본n']})",
-               color=palette.get(r["유형"], "#999"))
-    ax.set_xticks(xx + w * (len(prof22) - 1) / 2); ax.set_xticklabels(feat_labels)
-    ax.set_ylabel("특징 보유율(%)")
-    ax.set_title("2022 쉬었음 취약 하위유형 — 군집 프로파일(재현성 확인)")
-    ax.legend(); ax.grid(axis="y", alpha=0.3)
-    _save(fig, "18_cluster_profile_2022.png")
 
 
 if __name__ == "__main__":
