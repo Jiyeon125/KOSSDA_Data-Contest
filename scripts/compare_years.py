@@ -94,12 +94,45 @@ def main() -> int:
     cont_df = pd.DataFrame(rows_c)
     print(cont_df.to_string(index=False))
 
-    # (구) [4] 군집 하위유형 재현성 — 군집 서사 폐기(D1)로 제거.
+    # === 4) 사적 안전망(가족·지인) 약화 — 2022 vs 2024 ===
+    print("\n" + "=" * 64)
+    print("[4] 쉬었음 사적 안전망 — 2022 vs 2024 (가족 버팀목이 얇아지는가)")
+    net_df = _safety_net_table(r22, r24, both)
+    print(net_df.to_string(index=False))
+
+    # (구) 군집 하위유형 재현성 — 군집 서사 폐기(D1)로 제거.
     #     내부 위험은 '양/유형 군집'이 아니라 '고립' 단일 축으로 본다(step5).
 
     _figures(size_df, flag_df)
-    print("\n[compare] 완료. 그림: outputs/figures/16~17")
+    _fig_safety_net(net_df)
+    print("\n[compare] 완료. 그림: outputs/figures/16~17, 17b")
     return 0
+
+
+# 사적 안전망 지표(연도 코딩 동일) — '동거/도움 가능'은 클수록 두꺼운 안전망
+NET = {
+    "not_parent_cohabit": ("부모 동거", True),   # True = 보여줄 때 100-값(동거율)으로 반전
+    "help_living_family": ("가족 도움\n가능", False),
+    "help_living_acq": ("지인 도움\n가능", False),
+    "help_living_public": ("공공기관\n도움", False),
+    "no_help_flag": ("도움받을 곳\n없음", False),
+}
+
+
+def _safety_net_table(r22, r24, both) -> pd.DataFrame:
+    rows = []
+    for col, (label, invert) in NET.items():
+        if col not in r22.columns or col not in r24.columns:
+            continue
+        w22 = q.weighted_share(r22, col)["비율_가중(%)"]
+        w24 = q.weighted_share(r24, col)["비율_가중(%)"]
+        if invert:
+            w22, w24 = round(100 - w22, 1), round(100 - w24, 1)
+        test = q.chi_square_compare(both, "survey_year", col, 2022, 2024)
+        rows.append({"지표": label.replace("\n", " "), "2022_%": w22, "2024_%": w24,
+                     "p": None if test["p"] is None else round(test["p"], 4),
+                     "유의": test.get("유의")})
+    return pd.DataFrame(rows)
 
 
 def _figures(size_df, flag_df) -> None:
@@ -135,6 +168,35 @@ def _figures(size_df, flag_df) -> None:
             "취약 소수 비중↑ = 내부 격차 심화. 고립은 척도변경으로 제외.",
             transform=ax.transAxes, ha="right", va="top", fontsize=8, color="#666")
     _save(fig, "17_rested_vuln_2022_2024.png")
+
+
+def _fig_safety_net(net_df) -> None:
+    # --- Fig 17b: 사적 안전망(가족·지인) 약화 2022 vs 2024 ---
+    labels = [lab.replace("\n", " ") for lab in net_df["지표"]]
+    # '도움받을 곳 없음'만 늘수록 나쁨(빨강), 나머지는 줄수록 나쁨(안전망 두께)
+    bad_up = net_df["지표"].str.contains("없음")
+    fig, ax = plt.subplots(figsize=(10, 5))
+    x = np.arange(len(labels)); width = 0.38
+    ax.bar(x - width / 2, net_df["2022_%"], width, label="2022", color=YEAR_COLORS[2022])
+    ax.bar(x + width / 2, net_df["2024_%"], width, label="2024", color=YEAR_COLORS[2024])
+    for i, r in net_df.iterrows():
+        sig = "*" if (r["유의"] and "유의(" in str(r["유의"])) else ""
+        top = max(r["2022_%"], r["2024_%"])
+        # 변화량(+별표)을 한 라벨로 — 악화=빨강, 완화=회색
+        delta = r["2024_%"] - r["2022_%"]
+        worse = (delta > 0) if bad_up.iloc[i] else (delta < 0)
+        ax.text(i, top + 2.5, f"{delta:+.1f}p{sig}", ha="center", fontsize=9,
+                fontweight="bold", color="#E45756" if worse else "#888")
+    ax.set_xticks(x); ax.set_xticklabels(labels)
+    ax.set_ylabel("쉬었음 중 해당 비율(가중 %)")
+    ax.set_title("쉬었음 청년의 '사적 안전망'은 얇아진다 — 2022 vs 2024  (*p<.05)\n"
+                 "부모 동거·가족/지인 도움↓, '도움받을 곳 없음'↑ → 가족 버팀목 약화·제도 공백")
+    ax.legend(); ax.grid(axis="y", alpha=0.3); ax.margins(y=0.2)
+    ax.text(0.99, -0.17,
+            "※ 공공·민간 제도 도움은 두 해 모두 3~4%로 거의 무변(공백 지속). "
+            "'도움 가능'은 주관응답이라 체감경기 영향 가능하나, 객관적 '없음'도 함께 2배.",
+            transform=ax.transAxes, ha="right", va="top", fontsize=8, color="#666")
+    _save(fig, "17b_rested_safety_net_2022_2024.png")
 
 
 if __name__ == "__main__":
