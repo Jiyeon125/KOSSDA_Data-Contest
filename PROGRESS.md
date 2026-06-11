@@ -41,6 +41,7 @@
   - 사적 안전망 약화(가족도움 95→85%, 도움없음 3.5→8.4%) / 고립은 척도차로 연도비교 제외(D9)
 - [x] **외부 보강**(`docs/external_data_references.md`): OECD/고용정보원 NEET 배경(fig00), 복지부 2023 고립·은둔 실태조사(fig23 수렴)
 - [x] **10단계 KGSS 전국 일반화(KOSSDA 기둥)** `scripts/kgss_isolation.py`, fig24 — 고립 격차 Δ0.317*** vs 취업 Δ0.023 n.s.(약 14배), 페널티 취업·미취업 일관. 부록 fig25(친구수 용량반응)·fig26(외로움→우울 2012). N=3,489(2021·23·25 통합)
+- [x] **12단계 사회통합실태조사 보조(KOSSDA)** — `data/raw/social_cohesion/` 2011–2024 .sav 14개 연도. 라벨 기반 변수 매핑(`src/cohesion_vars.py`, `docs/social_cohesion_varmap.md`). 추세 fig27(2013–24 청년 고립 19.0→25.4% 최근 상승), fig28(풀링 N=32,122 고립Δ0.356 vs 일자리Δ0.095). app S7 expander·소논문 §5.8
 - [x] **11단계 팀원 레포 머지(생활안전망 격차 H1~H4)** — H1 부모동거×부채(15.4 vs 30.2%, χ²=28.6, V=0.164), H2 가족지원×생활비(중앙값 200 vs 175, r=-0.17), H3 도달률(가족부재 156명 중 도움없음 57.1%·공공 14.1%), H4 위험군 23.0%·6유형. **재현가이드 §7 벤치마크 전 항목 일치 검증**. 헬퍼 `holding_rate/holder_median/holding_summary/coverage_rates` + Fisher 자동 전환(`queries.py`). 상세: `docs/merge_comparison.md`
 
 ## 3. 시각화 / 산출물

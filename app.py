@@ -75,6 +75,15 @@ def load_year(year: int) -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
+def load_cohesion_summary() -> dict | None:
+    """사회통합실태조사 청년 분석 요약(`scripts/cohesion_trend.py`)을 읽는다."""
+    p = Path(__file__).resolve().parent / "data" / "processed" / "social_cohesion_youth_summary.csv"
+    if not p.exists():
+        return None
+    return pd.read_csv(p).iloc[0].to_dict()
+
+
+@st.cache_data(show_spinner=False)
 def load_kgss_summary() -> dict | None:
     """KGSS 분석 산출 요약(`scripts/kgss_isolation.py`)을 읽어 반환한다(없으면 None)."""
     p = Path(__file__).resolve().parent / "data" / "processed" / "kgss_isolation_summary.csv"
@@ -619,6 +628,25 @@ elif section == SECTIONS[7]:
             unsafe_allow_html=True,
         )
 
+    with st.expander("📎 부록 — 사회통합실태조사: 청년 고립 연간 추세 (KOSSDA 보조)", expanded=False):
+        coh = load_cohesion_summary()
+        show_fig("27_cohesion_isolation_trend.png",
+                 "청년(19~39세) 관계적 고립 비율 — 2013~2024 연간(가중 wt1).")
+        show_fig("28_cohesion_isolation_vs_employment.png",
+                 "청년 풀링: 고립 격차가 일자리 격차보다 큼 (KGSS와 동일 방향).")
+        if coh is None:
+            st.info("`python scripts/cohesion_trend.py` 실행 후 요약이 표시됩니다.", icon="🧮")
+        else:
+            st.markdown(
+                f"- **데이터** · 사회통합실태조사 2013–2024, 청년 풀링 **N={int(coh['n']):,}** "
+                f"(연도별 n≈1,900–3,200). KOSSDA 소장."
+                f"\n- **고립** · 목돈·병시·우울 3문항 중 1개 이상 '없다' 응답. "
+                f"2022→2024: **19.0%→25.4%** (청년삶 '도움없음' 3.5→8.4%와 방향 일치, 측정 상이)."
+                f"\n- **웰빙 격차** · 고립 Δ={coh['d_iso']:.3f} (*p*<.001) vs 일자리 Δ={coh['d_emp']:.3f} "
+                f"(*p*<.01) — 약 **{coh['ratio']:.0f}배**. (KGSS는 일자리 격차 n.s., 여기서는 유의하나 크기는 작음)"
+                f"\n- **한계** · 연령은 구간변수(d2)라 19~39세 근사. 문항번호는 연도마다 달라 라벨 기반 매핑 "
+                f"(`docs/social_cohesion_varmap.md`)."
+            )
     with st.expander("📎 부록 — 친구 수 용량반응 / 외로움→우울 수렴", expanded=False):
         show_fig("25_kgss_friends_doseresponse.png", "믿는 친구 수↑ → 행복↑(0명에서 절벽). KGSS 2021·23·25.")
         show_fig("26_kgss_loneliness_depression_2012.png", "외로움↑ → 우울↑(MWU p<1e-23). 다른 해·다른 측정 수렴(2012).")
