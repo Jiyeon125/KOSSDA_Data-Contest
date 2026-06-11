@@ -21,6 +21,7 @@
 - [x] KLIPS 코드북 변수 매핑 확정(`scripts/klips_map.py`, 연령/성별/경활/소득/부채)
 - [x] KLIPS 26p/26h 전처리 + `hhid26` 조인 (`klips_youth_2023`, 청년 3,818명)
 - [x] 청년삶 2022 분석 전처리 `build_youth_2022_analysis()` (2024와 동일 파생규칙, econ 1/2/3 코딩 대응) → `youth_life_2022_analysis` 적재
+- [x] **팀원 레포(Inactive-Youth) 파생변수 이식** `_derive_team_risk_and_type6()` — risk_score(0–5)·risk_level·safety_net_type6 (2022·2024 공통, 재적재 완료)
 
 ## 2. 분석 / 통계검증
 > 🔴 **실제 분석 서사·결정의 단일 출처 = [`docs/analysis_flow.md`](docs/analysis_flow.md)** (1~10단계 + 결정로그 D1~D16, **LOCKED**).
@@ -40,12 +41,14 @@
   - 사적 안전망 약화(가족도움 95→85%, 도움없음 3.5→8.4%) / 고립은 척도차로 연도비교 제외(D9)
 - [x] **외부 보강**(`docs/external_data_references.md`): OECD/고용정보원 NEET 배경(fig00), 복지부 2023 고립·은둔 실태조사(fig23 수렴)
 - [x] **10단계 KGSS 전국 일반화(KOSSDA 기둥)** `scripts/kgss_isolation.py`, fig24 — 고립 격차 Δ0.317*** vs 취업 Δ0.023 n.s.(약 14배), 페널티 취업·미취업 일관. 부록 fig25(친구수 용량반응)·fig26(외로움→우울 2012). N=3,489(2021·23·25 통합)
+- [x] **11단계 팀원 레포 머지(생활안전망 격차 H1~H4)** — H1 부모동거×부채(15.4 vs 30.2%, χ²=28.6, V=0.164), H2 가족지원×생활비(중앙값 200 vs 175, r=-0.17), H3 도달률(가족부재 156명 중 도움없음 57.1%·공공 14.1%), H4 위험군 23.0%·6유형. **재현가이드 §7 벤치마크 전 항목 일치 검증**. 헬퍼 `holding_rate/holder_median/holding_summary/coverage_rates` + Fisher 자동 전환(`queries.py`). 상세: `docs/merge_comparison.md`
 
 ## 3. 시각화 / 산출물
 - [x] 인사이트용 경량 시각화 다수 `outputs/figures/` (fig00 NEET, 04c 생존, 21 고립, 23 은둔, 24~26 KGSS, 16/17/17b 재현성)
 - [x] `docs/visualization_strategy.md` 시각화 전략(상단 최신기준 배너 부착)
 - [x] **공모전 PPT 10장 초안 `발표_초안.md`** — 데이터·방법·인사이트·출처(링크/DOI)+그림 매핑 완료(1차 summary)
 - [x] Streamlit 대시보드 `app.py` — **확정 서사(고립 핵심·KGSS 기둥)로 재정렬** (S4 고립·S5 은둔·S6 KGSS, 군집/스펙트럼 폐기)
+- [x] **app.py S0~S9 머지 재구성(중간발표 디벨롭)** — S2 보유율 표·S3 H1/H2·S4 도달률·S5 위험 게이지/6유형 treemap/유형×삶만족 신규, 고립·KGSS·재현성은 S6~S8로 이동. `charts.gauge`·`charts.treemap` 추가
 - [x] 각 화면 '집계·분석 방법/읽는 법' 설명 보강 + 축 0기준 고정
 - [~] `발표_대본.md` — **STALE**: 옛 군집 S4 기준. 외부보강·은둔·KGSS 반영해 **재작성 필요**(`발표_초안.md` 기준으로)
 - [ ] PPT 실제 디자인(요약문 양식) + Streamlit Community Cloud 배포

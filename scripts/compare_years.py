@@ -100,8 +100,7 @@ def main() -> int:
     net_df = _safety_net_table(r22, r24, both)
     print(net_df.to_string(index=False))
 
-    # (구) 군집 하위유형 재현성 — 군집 서사 폐기(D1)로 제거.
-    #     내부 위험은 '양/유형 군집'이 아니라 '고립' 단일 축으로 본다(step5).
+    # 군집 하위유형 비교는 제거(D1). 내부 위험은 '고립' 축으로 본다.
 
     _figures(size_df, flag_df)
     _fig_safety_net(net_df)

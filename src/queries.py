@@ -330,15 +330,79 @@ def chi_square_compare(
     n = ct.values.sum()
     v = float(np.sqrt(chi2 / n)) if n else 0.0
     res.update({
+        "chi2": round(float(chi2), 1),
         "p": float(p),
+        "검정": "카이제곱",
         "효과크기V": round(v, 3),
         "효과해석": _effect_label_r(v),
         "최소기대빈도": round(float(expected.min()), 1),
-        "유의": "유의(p<.05)" if p < 0.05 else "비유의",
     })
+    # 2x2 기대빈도 < 5 → Fisher 정확검정으로 자동 전환 (소표본 보정)
     if expected.min() < 5:
-        res["경고"] = "기대빈도<5 (해석 주의)"
+        _, p = stats.fisher_exact(ct.values)
+        res["p"] = float(p)
+        res["검정"] = "Fisher 정확검정(기대빈도<5)"
+    res["유의"] = "유의(p<.05)" if res["p"] < 0.05 else "비유의"
     return res
+
+
+# ----------------------------------------------------------------------
+# 0-팽창(zero-inflated) 변수: 보유율·보유자 중앙값
+#   부채·이자·이전소득은 0이 많아 평균이 왜곡됨 →
+#   보유율(>0 비율) + 보유자 중앙값(>0 응답자 내 중앙값)으로 표현한다.
+# ----------------------------------------------------------------------
+
+def holding_rate(series: pd.Series) -> float:
+    """값 > 0 인 응답자 비율(보유율, 0~1). 결측은 분모에서 제외."""
+    s = pd.to_numeric(series, errors="coerce").dropna()
+    return float((s > 0).mean()) if len(s) else 0.0
+
+
+def holder_median(series: pd.Series) -> float:
+    """값 > 0 인 응답자(보유자)의 중앙값. 보유자가 없으면 0."""
+    s = pd.to_numeric(series, errors="coerce").dropna()
+    s = s[s > 0]
+    return float(s.median()) if len(s) else 0.0
+
+
+def holding_summary(df: pd.DataFrame, col_labels: dict[str, str]) -> pd.DataFrame:
+    """여러 0-팽창 변수의 보유율(%)·보유자 중앙값·보유자 수를 표로 반환한다.
+
+    Args:
+        df: 분석 대상 DataFrame.
+        col_labels: {컬럼명: 표시 라벨} 매핑. 없는 컬럼은 건너뜀.
+    """
+    rows = []
+    for col, label in col_labels.items():
+        if col not in df.columns:
+            continue
+        s = pd.to_numeric(df[col], errors="coerce").dropna()
+        rows.append({
+            "변수": label,
+            "보유율(%)": round(holding_rate(s) * 100, 1),
+            "보유자 중앙값(만원)": round(holder_median(s), 0),
+            "보유자 수(명)": int((s > 0).sum()),
+            "n": int(len(s)),
+        })
+    return pd.DataFrame(rows)
+
+
+def coverage_rates(df: pd.DataFrame, flag_labels: dict[str, str]) -> pd.DataFrame:
+    """이항 플래그(1=해당)들의 도달률(%)을 표로 반환한다.
+
+    가족지원 부재 집단 등에서 대체 안전망(지인/공공/민간/도움없음) 응답 비율을 계산한다.
+    """
+    rows = []
+    for col, label in flag_labels.items():
+        if col not in df.columns:
+            continue
+        s = pd.to_numeric(df[col], errors="coerce").dropna()
+        rows.append({
+            "안전망": label,
+            "도달률(%)": round(float((s == 1).mean() * 100), 1) if len(s) else None,
+            "해당자 수(명)": int((s == 1).sum()),
+        })
+    return pd.DataFrame(rows)
 
 
 if __name__ == "__main__":

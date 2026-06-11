@@ -524,6 +524,59 @@ def _derive_safety_and_vuln(work: pd.DataFrame) -> None:
     if vuln_parts:
         work["vuln_score"] = sum(vuln_parts).astype(int)
 
+    _derive_team_risk_and_type6(work)
+
+
+def _derive_team_risk_and_type6(work: pd.DataFrame) -> None:
+    """위험점수(0~5)·위험수준·생활안전망 6유형 파생 (in-place).
+
+    vuln_score(0~6)와 구성요소가 달라 별도 컬럼으로 둔다.
+      - risk_score(0~5) = 부모비동거 + 가족지원없음 + 도움망없음 + 부채보유 + 이자부담
+      - risk_level     = 저위험(0~1) / 중위험(2~3) / 고위험(4~5)
+      - safety_net_type6 = 우선순위 규칙 6유형
+    결측은 0(미보유/비동거)으로 처리한다.
+    """
+    def _f0(col: str) -> pd.Series:
+        """수치 변환 후 결측을 0으로."""
+        return pd.to_numeric(work.get(col), errors="coerce").fillna(0)
+
+    needed = ["live_with_parents", "help_living_family", "help_living_none",
+              "debt_total", "interest_monthly"]
+    if any(c not in work.columns for c in needed):
+        print("[preprocess] 안내: risk_score 산출에 필요한 변수가 없어 건너뜁니다.")
+        return
+
+    parent_cohabit = _f0("live_with_parents").eq(1)      # 1=동거, 그 외=비동거
+    family_help = _f0("help_living_family").eq(1)
+    no_help = _f0("help_living_none").eq(1)
+    has_debt = _f0("debt_total").gt(0)
+    has_interest = _f0("interest_monthly").gt(0)
+
+    work["risk_score"] = (
+        (~parent_cohabit).astype(int)
+        + (~family_help).astype(int)
+        + no_help.astype(int)
+        + has_debt.astype(int)
+        + has_interest.astype(int)
+    )
+    work["risk_level"] = pd.cut(
+        work["risk_score"], bins=[-1, 1, 3, 5],
+        labels=["저위험", "중위험", "고위험"],
+    ).astype("object")
+
+    # 생활안전망 6유형 (위에서부터 먼저 충족되는 규칙으로 배정)
+    financial_burden = has_debt | has_interest | _f0("debt_living").gt(0)
+    public_help = _f0("help_living_public").eq(1)
+    alt_help = _f0("help_living_acq").eq(1) | _f0("help_living_private").eq(1)
+
+    type6 = pd.Series("취약잠재형", index=work.index, dtype="object")
+    type6[alt_help] = "대체지원형"
+    type6[public_help] = "공공지원형"
+    type6[family_help & parent_cohabit] = "가족완충형"
+    type6[financial_burden] = "금융부담형"
+    type6[no_help] = "고립위험형"
+    work["safety_net_type6"] = type6
+
 
 def build_youth_2024_analysis(
     raw_path: Path = YOUTH_2024_RAW,

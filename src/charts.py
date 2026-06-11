@@ -233,6 +233,62 @@ def box_chart(
     return fig
 
 
+def gauge(
+    value: float,
+    title: str = "비율 게이지",
+    reference: float | None = None,
+    suffix: str = "%",
+    max_value: float = 100,
+    bar_color: str = "#E45756",
+) -> go.Figure:
+    """비율 게이지 (예: 위험군 ≥2 비율).
+
+    Args:
+        value: 표시할 값 (예: 23.0).
+        reference: 비교 기준값 (전체 대비 델타 표시, 선택).
+        suffix: 숫자 뒤 단위 표기.
+        max_value: 게이지 최대값.
+    """
+    indicator = go.Indicator(
+        mode="gauge+number" + ("+delta" if reference is not None else ""),
+        value=value,
+        number=dict(suffix=suffix),
+        delta=dict(reference=reference, suffix=suffix) if reference is not None else None,
+        gauge=dict(
+            axis=dict(range=[0, max_value]),
+            bar=dict(color=bar_color),
+        ),
+        title=dict(text=title),
+    )
+    fig = go.Figure(indicator)
+    fig.update_layout(margin=dict(l=30, r=30, t=60, b=20), height=300)
+    return fig
+
+
+def treemap(
+    df: pd.DataFrame,
+    path_col: str,
+    value_col: str,
+    title: str = "구성 트리맵",
+    color_map: dict | None = None,
+) -> go.Figure:
+    """범주별 규모를 면적으로 보여주는 트리맵 (예: 생활안전망 6유형 규모).
+
+    Args:
+        df: 범주(path_col)·값(value_col) 컬럼을 가진 DataFrame.
+        path_col: 범주 컬럼명.
+        value_col: 면적으로 쓸 값 컬럼명.
+        color_map: {범주값: 색상} 매핑(선택).
+    """
+    fig = px.treemap(
+        df, path=[path_col], values=value_col, title=title,
+        color=path_col, color_discrete_map=color_map,
+    )
+    fig.update_traces(textinfo="label+value+percent root")
+    fig.update_layout(title_x=0.0, margin=dict(l=20, r=20, t=60, b=20))
+    return fig
+
+
 if __name__ == "__main__":
     # 샘플 데이터로 동작 확인용 (실제 분석 결과 아님)
     sample = pd.DataFrame(
